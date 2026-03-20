@@ -76,11 +76,20 @@ class Article(db.Model):
     author = db.relationship('User', foreign_keys=[author_id], backref='articles_authored')
     last_editor = db.relationship('User', foreign_keys=[last_edited_by_id])
 
+    def _safe_get(self, attr, default=None):
+        try:
+            return getattr(self, attr)
+        except AttributeError:
+            return default
+
     def _needs_review(self):
-        if not self.review_due:
+        try:
+            if not self.review_due:
+                return False
+            from datetime import datetime
+            return datetime.utcnow() >= self.review_due
+        except AttributeError:
             return False
-        from datetime import datetime
-        return datetime.utcnow() >= self.review_due
 
     def _get_reactions(self):
         try:
@@ -108,9 +117,9 @@ class Article(db.Model):
             'comment_count': self.comments.count(),
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'reactions': self._get_reactions(),
-            'visibility': self.visibility or 'all',
-            'review_due': self.review_due.isoformat() if self.review_due else None,
-            'review_interval_days': self.review_interval_days or 180,
+            'visibility': self._safe_get('visibility', 'all'),
+            'review_due': self.review_due.isoformat() if self._safe_get('review_due') else None,
+            'review_interval_days': self._safe_get('review_interval_days', 180),
             'needs_review': self._needs_review(),
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
             'published_at': self.published_at.isoformat() if self.published_at else None,

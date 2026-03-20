@@ -265,18 +265,21 @@ def lock_status(article_id):
 @articles_bp.route('/needs-review', methods=['GET'])
 @login_required
 def needs_review():
-    from datetime import datetime
-    user = get_current_user()
-    q = Article.query.filter_by(status='published').filter(
-        Article.review_due != None,
-        Article.review_due <= datetime.utcnow()
-    )
-    if user.role != 'admin':
-        q = q.filter(
-            db.or_(Article.visibility == 'all', Article.visibility.like(f'%{user.role}%'))
+    try:
+        from datetime import datetime
+        user = get_current_user()
+        q = Article.query.filter_by(status='published').filter(
+            Article.review_due != None,
+            Article.review_due <= datetime.utcnow()
         )
-    articles = q.order_by(Article.review_due.asc()).all()
-    return jsonify([a.to_dict() for a in articles])
+        if user.role != 'admin':
+            q = q.filter(
+                db.or_(Article.visibility == 'all', Article.visibility.like(f'%{user.role}%'))
+            )
+        articles = q.order_by(Article.review_due.asc()).all()
+        return jsonify([a.to_dict() for a in articles])
+    except Exception:
+        return jsonify([])
 
 @articles_bp.route('/tags', methods=['POST'])
 @login_required
