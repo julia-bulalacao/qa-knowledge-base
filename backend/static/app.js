@@ -557,6 +557,7 @@ function renderEditor() {
       <label>Tags</label>
       <div style="display:flex;flex-wrap:wrap;gap:6px" id="tag-picker">
         ${(S.tags||[]).map(t => '<span class="tag ' + (selectedTags.includes(t.id)?'selected':'') + '" data-tag-id="' + t.id + '">' + esc(t.name) + '</span>').join('')}
+        <span id="add-tag-btn" style="display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:4px;border:1px dashed var(--border);font-size:12px;color:var(--text3);cursor:pointer">+ New Tag</span>
       </div>
     </div>
     <div class="form-group">
@@ -1501,6 +1502,30 @@ function bindPageEvents() {
     el.addEventListener('click', () => navigateTo('read', { articleId: parseInt(el.dataset.article) }));
   });
 
+  // Visibility selector
+  document.querySelectorAll('.vis-label').forEach(label => {
+    label.addEventListener('click', () => {
+      const slug = label.dataset.slug;
+      if (slug === 'all') {
+        document.querySelectorAll('.vis-label').forEach(l => {
+          const cb = l.querySelector('input'); const isAll = l.dataset.slug === 'all';
+          if (cb) cb.checked = isAll;
+          l.style.background = isAll ? 'var(--accent-light)' : 'var(--surface)';
+          l.style.color = isAll ? 'var(--accent)' : 'var(--text2)';
+        });
+      } else {
+        const allLabel = document.querySelector('.vis-label[data-slug="all"]');
+        const allCb = document.getElementById('vis-all');
+        if (allCb) allCb.checked = false;
+        if (allLabel) { allLabel.style.background = 'var(--surface)'; allLabel.style.color = 'var(--text2)'; }
+        const cb = document.getElementById('vis-' + slug);
+        if (cb) { cb.checked = !cb.checked; label.style.background = cb.checked ? 'var(--accent-light)' : 'var(--surface)'; label.style.color = cb.checked ? 'var(--accent)' : 'var(--text2)'; }
+        const anyChecked = [...document.querySelectorAll('.vis-label:not([data-slug="all"]) input')].some(c => c.checked);
+        if (!anyChecked && allCb) { allCb.checked = true; if (allLabel) { allLabel.style.background = 'var(--accent-light)'; allLabel.style.color = 'var(--accent)'; } }
+      }
+    });
+  });
+
   // Announcement
   document.getElementById('set-announcement-btn')?.addEventListener('click', () => {
     showAnnouncementEditor();
@@ -1548,6 +1573,7 @@ async function saveArticle(status) {
     title,
     content,
     visibility,
+    review_interval_days: parseInt(document.getElementById('e-review-interval')?.value || '0'),
     excerpt: document.getElementById('e-excerpt')?.value || '',
     content_type: document.getElementById('e-type')?.value || 'article',
     category_id: document.getElementById('e-cat')?.value || null,
