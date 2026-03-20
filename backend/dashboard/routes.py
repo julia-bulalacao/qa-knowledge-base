@@ -34,7 +34,8 @@ def get_dashboard():
 def get_announcement():
     from models import SiteSettings
     msg = SiteSettings.get('announcement', '')
-    return jsonify({'announcement': msg})
+    ann_id = SiteSettings.get('announcement_id', '')
+    return jsonify({'announcement': msg, 'id': ann_id})
 
 @dashboard_bp.route('/announcement', methods=['PUT'])
 @login_required
@@ -46,5 +47,6 @@ def set_announcement():
         return jsonify({'error': 'No permission'}), 403
     data = request.get_json()
     SiteSettings.set('announcement', data.get('message', ''), user.id)
-    return jsonify({'announcement': data.get('message', '')})
+    SiteSettings.set('announcement_id', str(data.get('id', '')), user.id)
+    return jsonify({'announcement': data.get('message', ''), 'id': data.get('id', '')})
 

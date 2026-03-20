@@ -1,6 +1,7 @@
 ﻿// ??? STATE ????????????????????????????????????????????????????????????????????
+let _modalOpen = false; // Prevent render from clearing open modals
 const S = {
-  user: null, token: null, perms: {}, darkMode: false, announcement: '',
+  user: null, token: null, perms: {}, darkMode: false, announcement: '', announcementId: null,
   page: 'home',
   categories: [], tags: [],
   articles: [], articleTotal: 0, articlePages: 1, articlePage: 1,
@@ -251,15 +252,15 @@ function renderHome() {
   if (!d) return `<div class="home-page"><div class="empty-state"><div class="empty-icon">📭</div><div class="empty-title">Loading...</div></div></div>`;
   return `<div class="home-page">
     <div class="home-hero">
-      ${S.announcement ? `
-      <div style="background:var(--yellow-light);border:1px solid var(--yellow);border-radius:var(--radius);padding:10px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px;font-size:13px">
-        <span style="font-size:16px">📢</span>
-        <span style="color:var(--yellow);font-weight:600;flex:1">${esc(S.announcement)}</span>
-        ${can('manage_users') ? `<button class="btn btn-ghost btn-sm" id="clear-announcement" style="color:var(--yellow);padding:2px 8px">✕</button>` : ''}
+      ${S.announcement && (can('manage_users') || localStorage.getItem('wiki_ack_announcement') === String(S.announcementId)) ? `
+      <div style="background:var(--yellow-light);border:1px solid var(--yellow);border-radius:var(--radius);padding:10px 16px;margin-bottom:16px;display:flex;align-items:flex-start;gap:10px;font-size:13px">
+        <span style="font-size:16px;flex-shrink:0">📢</span>
+        <span style="color:var(--yellow);font-weight:600;flex:1;line-height:1.6;white-space:pre-wrap">${S.announcement}</span>
+        ${can('manage_users') ? `<button class="btn btn-ghost btn-sm" id="clear-announcement" style="color:var(--yellow);padding:2px 8px;flex-shrink:0">✕</button>` : ''}
       </div>` : ''}
-      ${can('manage_users') && !S.announcement ? `
+      ${can('manage_users') ? `
       <div style="margin-bottom:10px">
-        <button class="btn btn-secondary btn-sm" id="set-announcement-btn" style="font-size:12px">📢 Post Announcement</button>
+        <button class="btn btn-secondary btn-sm" id="set-announcement-btn" style="font-size:12px">📢 ${S.announcement ? 'Edit' : 'Post'} Announcement</button>
       </div>` : ''}
       <h1>👋 Welcome, ${esc(S.user.name.split(' ')[0])}!</h1>
       <p>Your team's living documentation hub —SOPs, onboarding guides, bug fixes, and more.</p>
@@ -402,7 +403,7 @@ function renderReader(a) {
           ${(can('edit_any_article') || (can('edit_own_articles') && a.author?.id === S.user?.id)) ? `<button class="btn btn-secondary btn-sm" id="edit-this-btn" data-article="${a.id}">✏️ Edit</button>` : ''}
           ${can('publish_articles') && a.status === 'draft' ? `<button class="btn btn-success btn-sm" id="publish-btn" data-article="${a.id}">🚀 Publish</button>` : ''}
           ${can('export_pdf') ? `<a class="btn btn-secondary btn-sm" href="/api/articles/${a.id}/pdf" target="_blank" download title="Export as PDF">📄 Export PDF</a>` : ''}
-          ${can('delete_articles') ? `<button class="btn btn-danger btn-sm" id="del-this-btn" data-article="${a.id}">Delete</button>` : ''}
+          ${can('delete_articles') ? `<button class="btn btn-danger btn-sm" id="del-this-btn">Delete</button>` : ''}
         </div>
       </div>
       <div class="article-content">${renderMarkdown(a.content)}</div>
@@ -1013,39 +1014,69 @@ function openModal(html) {
   document.getElementById('overlay')?.addEventListener('click', e => { if (e.target.id === 'overlay') closeModal(); });
 }
 
-function closeModal() { document.getElementById('modal-root').innerHTML = ''; }
+function closeModal() { console.log('closeModal called from:', new Error().stack.split('\n').slice(1,3).join(' | ')); document.getElementById('modal-root').innerHTML = ''; }
 
 // ─── CUSTOM MODAL DIALOGS ─────────────────────────────────────────────────────
 function showConfirm({ title, message, confirmText = 'Confirm', cancelText = 'Cancel', danger = false }) {
   return new Promise(resolve => {
-    const id = 'cm' + Date.now();
-    const icon = danger ? '&#x26A0;' : '&#x2139;';
-    const iconBg = danger ? 'var(--red-light)' : 'var(--blue-light)';
-    const btnClass = danger ? 'btn-danger' : 'btn-primary';
-    document.getElementById('modal-root').innerHTML = `<div class="modal-overlay" id="${id}-ov">
-      <div class="modal" style="max-width:420px">
-        <div class="modal-header" style="border-bottom:none;padding-bottom:8px">
-          <div style="display:flex;align-items:center;gap:12px">
-            <div style="width:36px;height:36px;border-radius:50%;background:${iconBg};display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">${icon}</div>
-            <div class="modal-title">${title}</div>
-          </div>
-        </div>
-        <div class="modal-body" style="padding-top:4px;padding-bottom:8px">
-          <p style="font-size:14px;color:var(--text2);line-height:1.6">${message}</p>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-secondary" id="${id}-no">${cancelText}</button>
-          <button class="btn ${btnClass}" id="${id}-yes">${confirmText}</button>
-        </div>
-      </div>
-    </div>`;
-    const done = r => { document.getElementById('modal-root').innerHTML = ''; resolve(r); };
-    document.getElementById(id+'-yes').onclick = () => done(true);
-    document.getElementById(id+'-no').onclick = () => done(false);
-    document.getElementById(id+'-ov').onclick = e => { if(e.target.id===id+'-ov') done(false); };
-    setTimeout(() => document.getElementById(id+'-yes')?.focus(), 50);
+    _modalOpen = true;
+    const root = document.getElementById('modal-root');
+
+    // Build modal directly as DOM nodes - no innerHTML timing issues
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px;animation:overlayIn 0.18s ease';
+
+    const box = document.createElement('div');
+    box.style.cssText = 'background:var(--surface);border-radius:12px;padding:24px;max-width:400px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);border:1px solid var(--border);animation:modalIn 0.2s cubic-bezier(0.34,1.56,0.64,1)';
+
+    const ttl = document.createElement('div');
+    ttl.style.cssText = 'font-size:16px;font-weight:600;color:var(--text);margin-bottom:10px';
+    ttl.textContent = title;
+
+    const msg = document.createElement('p');
+    msg.style.cssText = 'font-size:14px;color:var(--text2);line-height:1.6;margin-bottom:20px';
+    msg.textContent = message;
+
+    const btns = document.createElement('div');
+    btns.style.cssText = 'display:flex;justify-content:flex-end;gap:10px';
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'btn btn-secondary';
+    cancelBtn.textContent = cancelText;
+
+    const confirmBtn = document.createElement('button');
+    confirmBtn.className = danger ? 'btn btn-danger' : 'btn btn-primary';
+    confirmBtn.textContent = confirmText;
+
+    btns.appendChild(cancelBtn);
+    btns.appendChild(confirmBtn);
+    box.appendChild(ttl);
+    box.appendChild(msg);
+    box.appendChild(btns);
+    overlay.appendChild(box);
+
+    // Clear and append
+    root.innerHTML = '';
+    root.appendChild(overlay);
+
+    const close = (result) => {
+      box.style.animation = 'modalOut 0.15s ease forwards';
+      overlay.style.animation = 'overlayOut 0.15s ease forwards';
+      setTimeout(() => { _modalOpen = false; root.innerHTML = ''; resolve(result); }, 150);
+    };
+
+    confirmBtn.addEventListener('click', (e) => { e.stopPropagation(); close(true); });
+    cancelBtn.addEventListener('click', (e) => { e.stopPropagation(); close(false); });
+
+    // Only bind overlay dismiss after a delay to prevent bubbled clicks
+    setTimeout(() => {
+      overlay.addEventListener('click', (e) => { if (e.target === overlay) close(false); });
+    }, 300);
+
+    setTimeout(() => confirmBtn.focus(), 50);
   });
 }
+
 
 function showPrompt({ title, message = '', placeholder = '', defaultValue = '', confirmText = 'OK', cancelText = 'Cancel' }) {
   return new Promise(resolve => {
@@ -1073,7 +1104,10 @@ function showPrompt({ title, message = '', placeholder = '', defaultValue = '', 
     document.getElementById(id+'-yes').onclick = () => done(inp.value);
     document.getElementById(id+'-no').onclick = () => done(null);
     document.getElementById(id+'-x').onclick = () => done(null);
-    document.getElementById(id+'-ov').onclick = e => { if(e.target.id===id+'-ov') done(null); };
+    setTimeout(() => {
+      const ov = document.getElementById(id+'-ov');
+      if (ov) ov.onclick = e => { if(e.target.id===id+'-ov') done(null); };
+    }, 200);
     inp.onkeydown = e => { if(e.key==='Enter') done(inp.value); if(e.key==='Escape') done(null); };
     setTimeout(() => { inp.focus(); inp.select(); }, 50);
   });
@@ -1099,10 +1133,12 @@ function can(perm) { return S.perms[perm] === true; }
 async function loadDashboard() {
   const [dash, ann] = await Promise.all([
     API.get('/dashboard'),
-    API.get('/dashboard/announcement').catch(() => ({announcement:''}))
+    API.get('/dashboard/announcement').catch(() => ({announcement:'', id: null}))
   ]);
   S.dashboardData = dash;
   S.announcement = ann.announcement || '';
+  // If no id stored yet, generate one from the announcement text (for existing announcements)
+  S.announcementId = ann.id || (ann.announcement ? 'legacy-' + ann.announcement.length + '-' + ann.announcement.slice(0,10).replace(/\s/g,'') : null);
 }
 
 async function loadArticles(extraFilters = {}) {
@@ -1123,8 +1159,16 @@ async function loadArticles(extraFilters = {}) {
 
 // ─── NAVIGATION ───────────────────────────────────────────────────────────────
 async function navigateTo(page, opts = {}) {
+  // Fade out content area
+  const pb = document.getElementById('page-body');
+  if (pb && S.page !== page) {
+    pb.classList.add('navigating');
+    await new Promise(r => setTimeout(r, 120));
+  }
   S.page = page;
   S.articlePage = 1;
+  // Clear category highlight when not on category page
+  if (page !== 'category') S.currentCategoryId = null;
   if (page === 'home') { await Promise.all([loadDashboard(), loadMeta()]); }
   if (page === 'all') { S.filters = { q:'', content_type:'', tag:'', status:'' }; await loadArticles(); }
   if (page === 'category' && opts.catId) {
@@ -1142,6 +1186,11 @@ async function navigateTo(page, opts = {}) {
   if (page === 'roles') { S.allRoles = await API.get('/roles'); }
   if (page === 'categories') { await loadMeta(); }
   render();
+  // Fade content back in
+  requestAnimationFrame(() => {
+    const pb2 = document.getElementById('page-body');
+    if (pb2) pb2.classList.remove('navigating');
+  });
 }
 
 function refreshBody() {
@@ -1185,7 +1234,7 @@ function bindEvents() {
 
 function bindPageEvents() {
   document.querySelectorAll('[data-article]').forEach(el => {
-    if (!el.classList.contains('edit-article-btn') && !el.classList.contains('del-article-btn')) {
+    if (!el.classList.contains('edit-article-btn') && !el.classList.contains('del-article-btn') && el.id !== 'del-this-btn') {
       el.addEventListener('click', e => {
         if (e.target.classList.contains('edit-article-btn') || e.target.classList.contains('del-article-btn')) return;
         navigateTo('read', { articleId: parseInt(el.dataset.article) });
@@ -1209,23 +1258,27 @@ function bindPageEvents() {
       await navigateTo(S.page === 'read' ? 'all' : S.page);
     });
   });
-  document.getElementById('edit-this-btn')?.addEventListener('click', async () => {
+  const editBtn = document.getElementById('edit-this-btn');
+  if (editBtn) editBtn.onclick = async () => {
     const a = await API.get(`/articles/${S.currentArticle.id}`);
     navigateTo('edit', { article: a });
-  });
-  document.getElementById('publish-btn')?.addEventListener('click', async () => {
+  };
+  const pubBtn = document.getElementById('publish-btn');
+  if (pubBtn) pubBtn.onclick = async () => {
     await API.put(`/articles/${S.currentArticle.id}`, { status: 'published', change_summary: 'Published' });
     toast('Published!');
     S.currentArticle = await API.get(`/articles/${S.currentArticle.id}`);
     refreshBody();
-  });
-  document.getElementById('del-this-btn')?.addEventListener('click', async () => {
-    const ok = await showConfirm({ title: 'Delete Article', message: 'Are you sure you want to delete this article?', confirmText: 'Yes, Delete', danger: true });
+  };
+  const delBtn = document.getElementById('del-this-btn');
+  if (delBtn) delBtn.onclick = async (e) => {
+    e.stopPropagation();
+    const ok = await showConfirm({ title: 'Delete Article', message: 'This article will be permanently deleted.', confirmText: 'Yes, Delete', danger: true });
     if (!ok) return;
     await API.del(`/articles/${S.currentArticle.id}`);
-    toast('Deleted');
+    toast('Article deleted');
     navigateTo('all');
-  });
+  };
   document.getElementById('post-comment')?.addEventListener('click', async () => {
     const content = document.getElementById('new-comment')?.value?.trim();
     if (!content) return;
@@ -1290,7 +1343,8 @@ function bindPageEvents() {
     });
   });
   document.querySelectorAll('.del-cat-btn').forEach(el => {
-    el.addEventListener('click', async () => {
+    el.addEventListener('click', async (e) => {
+      e.stopPropagation();
       const ok = await showConfirm({ title: 'Delete Category', message: 'Are you sure you want to delete this category? This cannot be undone.', confirmText: 'Yes, Delete', danger: true });
       if (!ok) return;
       try {
@@ -1336,7 +1390,8 @@ function bindPageEvents() {
     });
   });
   document.querySelectorAll('.del-user-btn').forEach(el => {
-    el.addEventListener('click', async () => {
+    el.addEventListener('click', async (e) => {
+      e.stopPropagation();
       const ok = await showConfirm({ title: 'Delete User', message: 'Are you sure you want to delete this user? This cannot be undone.', confirmText: 'Yes, Delete', danger: true });
       if (!ok) return;
       try {
@@ -1409,12 +1464,8 @@ function bindPageEvents() {
   }
 
   // Announcement
-  document.getElementById('set-announcement-btn')?.addEventListener('click', async () => {
-    const msg = await showPrompt({ title: 'Post Announcement', message: 'This will show as a banner on the home page for all users', placeholder: 'e.g. System maintenance tonight at 9PM', confirmText: 'Post' });
-    if (msg) {
-      await API.put('/dashboard/announcement', { message: msg });
-      S.announcement = msg; refreshBody(); toast('Announcement posted! 📢');
-    }
+  document.getElementById('set-announcement-btn')?.addEventListener('click', () => {
+    showAnnouncementEditor();
   });
   document.getElementById('clear-announcement')?.addEventListener('click', async () => {
     await API.put('/dashboard/announcement', { message: '' });
@@ -1435,10 +1486,11 @@ function bindEditorEvents() {
   });
   document.getElementById('save-draft-btn')?.addEventListener('click', () => saveArticle('draft'));
   document.getElementById('publish-article-btn')?.addEventListener('click', () => saveArticle('published'));
-  document.getElementById('back-btn')?.addEventListener('click', () => {
+  const backBtn = document.getElementById('back-btn');
+  if (backBtn) backBtn.onclick = () => {
     if (S.editingArticle?.id) { ArticleLock.release(S.editingArticle.id); navigateTo('read', { articleId: S.editingArticle.id }); }
     else navigateTo('all');
-  });
+  };
 }
 
 async function saveArticle(status) {
@@ -1484,6 +1536,14 @@ async function doLogin() {
     localStorage.setItem('wiki_token', data.token);
     await Promise.all([loadDashboard(), loadMeta(), loadPermissions()]);
     render();
+    // Show announcement modal if unacknowledged
+    if (S.announcement && S.announcementId) {
+      const acked = localStorage.getItem('wiki_ack_announcement');
+      console.log('[announcement] id:', S.announcementId, 'acked:', acked, 'match:', acked === String(S.announcementId));
+      if (acked !== String(S.announcementId)) {
+        setTimeout(() => showAnnouncementModal(S.announcement, S.announcementId), 600);
+      }
+    }
   } catch(e) { S.loginError = e.message; render(); }
 }
 
@@ -1584,6 +1644,151 @@ function addCopyButtons(container) {
   });
 }
 
+
+// ─── ANNOUNCEMENT FUNCTIONS ───────────────────────────────────────────────────
+
+function showAnnouncementEditor() {
+  const current = S.announcement || '';
+  const root = document.getElementById('modal-root');
+  _modalOpen = true;
+
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px;animation:overlayIn 0.18s ease';
+
+  const box = document.createElement('div');
+  box.style.cssText = 'background:var(--surface);border-radius:12px;width:100%;max-width:560px;box-shadow:0 20px 60px rgba(0,0,0,0.25);border:1px solid var(--border);animation:modalIn 0.2s cubic-bezier(0.34,1.56,0.64,1);display:flex;flex-direction:column';
+
+  box.innerHTML = `
+    <div style="padding:20px 24px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-size:16px;font-weight:600;color:var(--text)">📢 Post Announcement</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:3px">Shown as a banner to all users on their next login</div>
+      </div>
+      <button id="ann-close-btn" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--text3);padding:4px 8px">✕</button>
+    </div>
+    <div style="padding:20px 24px">
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:0.05em">Announcement</label>
+        <textarea id="ann-text" rows="4" placeholder="e.g. System maintenance tonight at 9PM. All users will be logged out at 11PM." style="width:100%;margin-top:8px;padding:12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface2);color:var(--text);font-size:14px;font-family:var(--font);line-height:1.6;resize:vertical;outline:none">${esc(current)}</textarea>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--yellow-light);border:1px solid var(--yellow);border-radius:var(--radius)">
+        <span style="font-size:16px">💡</span>
+        <span style="font-size:12px;color:var(--yellow)">Users will see a modal asking them to acknowledge the announcement on their next login.</span>
+      </div>
+    </div>
+    <div style="padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+      <div>
+        ${current ? `<button id="ann-clear-btn" class="btn" style="background:var(--red-light);color:var(--red);border:1px solid #f5b4b0;font-size:13px">🗑 Clear Announcement</button>` : ''}
+      </div>
+      <div style="display:flex;gap:10px">
+        <button id="ann-cancel-btn" class="btn btn-secondary">Cancel</button>
+        <button id="ann-post-btn" class="btn btn-primary">📢 Post</button>
+      </div>
+    </div>
+  `;
+
+  overlay.appendChild(box);
+  root.innerHTML = '';
+  root.appendChild(overlay);
+
+  const close = () => {
+    box.style.animation = 'modalOut 0.15s ease forwards';
+    overlay.style.animation = 'overlayOut 0.15s ease forwards';
+    setTimeout(() => { _modalOpen = false; root.innerHTML = ''; }, 150);
+  };
+
+  document.getElementById('ann-close-btn').onclick = close;
+  document.getElementById('ann-cancel-btn').onclick = close;
+
+  document.getElementById('ann-post-btn').onclick = async () => {
+    const msg = document.getElementById('ann-text').value.trim();
+    if (!msg) { toast('Please enter an announcement', 'error'); return; }
+    const newId = Date.now();
+    await API.put('/dashboard/announcement', { message: msg, id: newId });
+    S.announcement = msg;
+    S.announcementId = newId;
+    close();
+    refreshBody();
+    toast('Announcement posted! 📢');
+  };
+
+  document.getElementById('ann-clear-btn')?.addEventListener('click', async () => {
+    await API.put('/dashboard/announcement', { message: '', id: null });
+    S.announcement = '';
+    S.announcementId = null;
+    close();
+    refreshBody();
+    toast('Announcement cleared');
+  });
+
+  // Focus textarea
+  setTimeout(() => document.getElementById('ann-text')?.focus(), 100);
+
+  setTimeout(() => {
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+  }, 300);
+}
+
+function showAnnouncementModal(message, id) {
+  // Don't show if already acknowledged
+  if (localStorage.getItem('wiki_ack_announcement') === String(id)) return;
+
+  const root = document.getElementById('modal-root');
+  _modalOpen = true;
+
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px;animation:overlayIn 0.25s ease';
+
+  const box = document.createElement('div');
+  box.style.cssText = 'background:var(--surface);border-radius:14px;width:100%;max-width:500px;box-shadow:0 24px 80px rgba(0,0,0,0.3);border:1px solid var(--border);animation:modalIn 0.25s cubic-bezier(0.34,1.56,0.64,1);overflow:hidden';
+
+  box.innerHTML = `
+    <div style="background:var(--yellow-light);border-bottom:2px solid var(--yellow);padding:20px 24px;display:flex;align-items:center;gap:14px">
+      <div style="font-size:32px">📢</div>
+      <div>
+        <div style="font-size:15px;font-weight:700;color:var(--yellow)">Team Announcement</div>
+        <div style="font-size:12px;color:var(--yellow);opacity:0.8;margin-top:2px">Please read before continuing</div>
+      </div>
+    </div>
+    <div style="padding:24px">
+      <div style="font-size:14px;color:var(--text);line-height:1.7;white-space:pre-wrap;word-break:break-word">${esc(message)}</div>
+    </div>
+    <div style="padding:16px 24px;border-top:1px solid var(--border);background:var(--bg2)">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:16px">
+        <input type="checkbox" id="ann-ack-check" style="width:16px;height:16px;accent-color:var(--green);cursor:pointer">
+        <span style="font-size:13px;color:var(--text2)">I have read and acknowledged this announcement</span>
+      </label>
+      <button id="ann-ack-btn" class="btn btn-primary" style="width:100%;justify-content:center;opacity:0.4;pointer-events:none">Continue</button>
+    </div>
+  `;
+
+  overlay.appendChild(box);
+  root.innerHTML = '';
+  root.appendChild(overlay);
+
+  // Enable button only when checkbox is checked
+  const checkbox = document.getElementById('ann-ack-check');
+  const ackBtn = document.getElementById('ann-ack-btn');
+
+  checkbox.addEventListener('change', () => {
+    ackBtn.style.opacity = checkbox.checked ? '1' : '0.4';
+    ackBtn.style.pointerEvents = checkbox.checked ? 'auto' : 'none';
+  });
+
+  ackBtn.addEventListener('click', () => {
+    if (!checkbox.checked) return;
+    localStorage.setItem('wiki_ack_announcement', String(id));
+    box.style.animation = 'modalOut 0.2s ease forwards';
+    overlay.style.animation = 'overlayOut 0.2s ease forwards';
+    setTimeout(() => {
+      _modalOpen = false;
+      root.innerHTML = '';
+      // Now show the yellow banner
+      if (S.page === 'home') refreshBody();
+    }, 200);
+  });
+}
+
 // ─── BOOT ─────────────────────────────────────────────────────────────────────
 function initDarkMode() {
   const saved = localStorage.getItem('wiki_dark');
@@ -1618,8 +1823,16 @@ async function boot() {
       await Promise.all([loadDashboard(), loadMeta(), loadPermissions()]);
     } catch { S.token = null; localStorage.removeItem('wiki_token'); }
   }
-  document.getElementById('loading-screen')?.remove();
+  const ls = document.getElementById('loading-screen');
+  if (ls) { ls.style.opacity = '0'; setTimeout(() => ls.remove(), 300); }
   render();
+  // Show announcement modal on restore if unacknowledged
+  if (S.announcement && S.announcementId) {
+    const acked = localStorage.getItem('wiki_ack_announcement');
+    if (acked !== String(S.announcementId)) {
+      setTimeout(() => showAnnouncementModal(S.announcement, S.announcementId), 800);
+    }
+  }
 }
 
 boot();
