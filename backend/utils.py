@@ -1,6 +1,7 @@
 from functools import wraps
 from flask import request, jsonify, session
 import re
+import os
 
 def get_current_user():
     from models import User
@@ -10,8 +11,7 @@ def get_current_user():
         if token:
             import jwt
             try:
-                import os
-            data = jwt.decode(token, os.environ.get('SECRET_KEY', 'qa-wiki-secret-2024'), algorithms=['HS256'])
+                data = jwt.decode(token, os.environ.get('SECRET_KEY', 'qa-wiki-secret-2024'), algorithms=['HS256'])
                 user_id = data.get('user_id')
             except:
                 return None
@@ -20,21 +20,17 @@ def get_current_user():
     return None
 
 def get_role(user):
-    """Get the Role object for a user, falling back to slug-based lookup."""
     if not user:
         return None
     from models import Role
-    # Try by role_slug first, then by role field
     slug = user.role_slug or user.role
     return Role.query.filter_by(slug=slug).first()
 
 def has_permission(user, perm):
-    """Check if user has a specific permission via their Role in the DB."""
     if not user:
         return False
     role = get_role(user)
     if not role:
-        # Fallback to hardcoded if role not in DB yet
         fallback = {
             'admin': True,
             'qa_engineer': perm in ['create_articles','edit_own_articles','publish_articles',
@@ -55,7 +51,6 @@ def login_required(f):
     return decorated
 
 def role_required(*roles):
-    """Legacy decorator — checks role slug. Use perm_required for new checks."""
     def decorator(f):
         @wraps(f)
         def decorated(*args, **kwargs):
@@ -69,7 +64,6 @@ def role_required(*roles):
     return decorator
 
 def perm_required(perm):
-    """Check DB-driven permission for a route."""
     def decorator(f):
         @wraps(f)
         def decorated(*args, **kwargs):
