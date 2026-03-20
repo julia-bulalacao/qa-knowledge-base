@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: qa-wiki
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --chdir backend app:create_app() --bind 0.0.0.0:$PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: SECRET_KEY
+        value: your-super-secret-key-change-this
+    disk:
+      name: wiki-db
+      mountPath: /data
+      sizeGB: 1
