@@ -31,14 +31,17 @@ def list_articles():
 
     # Filter by visibility - admin sees all, others see only their role's articles
     if user.role != 'admin':
-        from sqlalchemy import or_
-        q = q.filter(
-            or_(
-                Article.visibility == 'all',
-                Article.visibility == None,
-                Article.visibility.like(f'%{user.role}%')
+        try:
+            from sqlalchemy import or_
+            q = q.filter(
+                or_(
+                    Article.visibility == 'all',
+                    Article.visibility == None,
+                    Article.visibility.like(f'%{user.role}%')
+                )
             )
-        )
+        except AttributeError:
+            pass  # visibility column not available yet
 
     kw = request.args.get('q')
     if kw:
