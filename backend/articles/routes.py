@@ -7,6 +7,17 @@ from sqlalchemy import or_
 
 articles_bp = Blueprint('articles', __name__)
 
+def _save_history(article, user, change_summary=''):
+    from models import ArticleHistory
+    history = ArticleHistory(
+        article_id=article.id,
+        user_id=user.id,
+        content=article.content,
+        change_summary=change_summary,
+        version=article.version or 1
+    )
+    db.session.add(history)
+
 @articles_bp.route('', methods=['GET'])
 @login_required
 def list_articles():
