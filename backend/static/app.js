@@ -561,6 +561,27 @@ function renderEditor() {
       </div>
     </div>
     <div class="form-group">
+      <label>Review Reminder</label>
+      <select id="e-review-interval" style="width:100%">
+        <option value="0" ${(!a?.review_interval_days||a?.review_interval_days==0)?'selected':''}>No reminder</option>
+        <option value="30" ${a?.review_interval_days==30?'selected':''}>1 month</option>
+        <option value="90" ${a?.review_interval_days==90?'selected':''}>3 months</option>
+        <option value="180" ${a?.review_interval_days==180?'selected':''}>6 months</option>
+        <option value="365" ${a?.review_interval_days==365?'selected':''}>1 year</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Visibility</label>
+      <div style="display:flex;flex-wrap:wrap;gap:8px" id="vis-picker">
+        ${[{slug:'all',name:'Everyone'},{slug:'admin',name:'Admin'},{slug:'qa_engineer',name:'QA Engineer'},{slug:'developer',name:'Developer'},{slug:'viewer',name:'Viewer'}].map(r => {
+          const vis = a?.visibility || 'all';
+          const checked = vis === 'all' ? r.slug === 'all' : (r.slug !== 'all' && vis.split(',').includes(r.slug));
+          return '<label class="vis-label" data-slug="' + r.slug + '" style="display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;border:1px solid var(--border);cursor:pointer;font-size:12px;font-weight:500;background:' + (checked?'var(--accent-light)':'var(--surface)') + ';color:' + (checked?'var(--accent)':'var(--text2)') + '">' +
+            '<input type="checkbox" id="vis-' + r.slug + '" ' + (checked?'checked':'') + ' style="display:none">' + esc(r.name) + '</label>';
+        }).join('')}
+      </div>
+    </div>
+    <div class="form-group">
       <label>Content</label>
       <div id="rte-container"></div>
     </div>
