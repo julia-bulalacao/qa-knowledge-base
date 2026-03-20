@@ -170,8 +170,11 @@ function renderSidebar() {
         <span class="nav-icon">👥</span><span>Users</span>
       </div>
       <div class="nav-item ${S.page==='roles'?'active':''}" data-page="roles">
-        <span class="nav-icon">🔒</span><span>Roles & Permissions</span>
+        <span class="nav-icon">🔒</span><span>Roles</span>
       </div>` : ''}
+      <div class="nav-item" id="mobile-dark-toggle" style="display:none">
+        <span class="nav-icon">${S.darkMode ? '☀️' : '🌙'}</span><span>${S.darkMode ? 'Light' : 'Dark'}</span>
+      </div>
       <div class="nav-divider"></div>
       <div class="sidebar-section">
         <div class="sidebar-section-header" id="cats-toggle">
@@ -1209,6 +1212,10 @@ function bindEvents() {
     el.addEventListener('click', () => navigateTo('category', { catId: parseInt(el.dataset.cat) }));
   });
   document.getElementById('dark-toggle')?.addEventListener('click', toggleDarkMode);
+  document.getElementById('mobile-dark-toggle')?.addEventListener('click', toggleDarkMode);
+  // Show mobile dark toggle only on mobile
+  const mobileDark = document.getElementById('mobile-dark-toggle');
+  if (mobileDark) mobileDark.style.display = window.innerWidth <= 768 ? 'flex' : 'none';
   document.getElementById('logout-btn')?.addEventListener('click', async () => {
     await API.post('/auth/logout');
     S.user = null; S.token = null; localStorage.removeItem('wiki_token');
@@ -1810,6 +1817,10 @@ function toggleDarkMode() {
   }
   // Re-wire the dark toggle event after re-render
   document.getElementById('dark-toggle')?.addEventListener('click', toggleDarkMode);
+  document.getElementById('mobile-dark-toggle')?.addEventListener('click', toggleDarkMode);
+  // Show mobile dark toggle only on mobile
+  const mobileDark = document.getElementById('mobile-dark-toggle');
+  if (mobileDark) mobileDark.style.display = window.innerWidth <= 768 ? 'flex' : 'none';
 }
 
 async function boot() {
