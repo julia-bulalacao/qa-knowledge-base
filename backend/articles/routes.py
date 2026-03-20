@@ -11,8 +11,9 @@ def _save_history(article, user, change_summary=''):
     from models import ArticleHistory
     history = ArticleHistory(
         article_id=article.id,
-        user_id=user.id,
-        content=article.content,
+        editor_id=user.id,
+        content_snapshot=article.content,
+        title_snapshot=article.title,
         change_summary=change_summary,
         version=article.version or 1
     )
