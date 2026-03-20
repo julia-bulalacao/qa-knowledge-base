@@ -891,6 +891,14 @@ function bindRoleModalEvents() {
 function renderUsersPage() {
   const users = S.allUsers || [];
   const roleColors = {admin:'#ef4444',qa_engineer:'#3b82f6',developer:'#10b981',viewer:'#6366f1'};
+  const getRoleColor = (role) => {
+    if (getRoleColor(role)) return getRoleColor(role);
+    // Generate consistent color from role name
+    let hash = 0;
+    for (let i = 0; i < role.length; i++) hash = role.charCodeAt(i) + ((hash << 5) - hash);
+    const colors = ['#f59e0b','#8b5cf6','#ec4899','#14b8a6','#f97316','#06b6d4','#84cc16','#a855f7'];
+    return colors[Math.abs(hash) % colors.length];
+  };
   const roleLabels = {admin:'Admin',qa_engineer:'QA Engineer',developer:'Developer',viewer:'Viewer'};
   return `<div style="max-width:900px;margin:0 auto;padding:28px 24px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">
@@ -903,7 +911,7 @@ function renderUsersPage() {
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px">
       ${['admin','qa_engineer','developer','viewer'].map(role => {
         const count = users.filter(u => u.role === role).length;
-        return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius2);padding:14px;border-top:3px solid ' + roleColors[role] + '"><div style="font-size:22px;font-weight:700;color:' + roleColors[role] + ';font-family:var(--mono)">' + count + '</div><div style="font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-top:3px">' + roleLabels[role] + '</div></div>';
+        return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius2);padding:14px;border-top:3px solid ' + getRoleColor(role) + '"><div style="font-size:22px;font-weight:700;color:' + getRoleColor(role) + ';font-family:var(--mono)">' + count + '</div><div style="font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-top:3px">' + roleLabels[role] + '</div></div>';
       }).join('')}
     </div>
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius2);overflow:hidden">
@@ -919,7 +927,7 @@ function renderUsersPage() {
         <tbody>
           ${users.map(u => {
             const isMe = u.id === S.user.id;
-            return '<tr style="border-top:1px solid var(--border)"><td style="padding:12px 16px"><div style="display:flex;align-items:center;gap:10px"><div class="avatar" style="width:34px;height:34px;background:' + (u.avatar_color||'#6366f1') + ';font-size:12px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;color:white">' + u.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase() + '</div><div><div style="font-weight:600;font-size:13px">' + esc(u.name) + '</div>' + (isMe ? '<div style="font-size:10px;color:var(--accent);font-weight:600">You</div>' : '') + '</div></div></td><td style="padding:12px 16px;color:var(--text2);font-size:13px">' + esc(u.email) + '</td><td style="padding:12px 16px"><span style="display:inline-flex;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;background:' + roleColors[u.role] + '22;color:' + roleColors[u.role] + ';border:1px solid ' + roleColors[u.role] + '44">' + (roleLabels[u.role]||u.role) + '</span></td><td style="padding:12px 16px"><span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:' + (u.is_active?'var(--green)':'var(--text3)') + '"><span style="width:7px;height:7px;border-radius:50%;background:' + (u.is_active?'var(--green)':'var(--text4)') + '"></span>' + (u.is_active?'Active':'Inactive') + '</span></td><td style="padding:12px 16px;color:var(--text3);font-size:12px">' + relTime(u.created_at) + '</td><td style="padding:12px 16px;text-align:right"><div style="display:flex;gap:6px;justify-content:flex-end"><button class="btn btn-secondary btn-sm edit-user-btn" data-uid="' + u.id + '">Edit</button>' + (!isMe ? '<button class="btn btn-sm del-user-btn" style="background:var(--red-light);color:var(--red);border:1px solid #f5b4b0" data-uid="' + u.id + '">Delete</button>' : '') + '</div></td></tr>';
+            return '<tr style="border-top:1px solid var(--border)"><td style="padding:12px 16px"><div style="display:flex;align-items:center;gap:10px"><div class="avatar" style="width:34px;height:34px;background:' + (u.avatar_color||'#6366f1') + ';font-size:12px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;color:white">' + u.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase() + '</div><div><div style="font-weight:600;font-size:13px">' + esc(u.name) + '</div>' + (isMe ? '<div style="font-size:10px;color:var(--accent);font-weight:600">You</div>' : '') + '</div></div></td><td style="padding:12px 16px;color:var(--text2);font-size:13px">' + esc(u.email) + '</td><td style="padding:12px 16px"><span style="display:inline-flex;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;background:' + getRoleColor(u.role) + '22;color:' + getRoleColor(u.role) + ';border:1px solid ' + getRoleColor(u.role) + '44">' + (roleLabels[u.role]||u.role) + '</span></td><td style="padding:12px 16px"><span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:' + (u.is_active?'var(--green)':'var(--text3)') + '"><span style="width:7px;height:7px;border-radius:50%;background:' + (u.is_active?'var(--green)':'var(--text4)') + '"></span>' + (u.is_active?'Active':'Inactive') + '</span></td><td style="padding:12px 16px;color:var(--text3);font-size:12px">' + relTime(u.created_at) + '</td><td style="padding:12px 16px;text-align:right"><div style="display:flex;gap:6px;justify-content:flex-end"><button class="btn btn-secondary btn-sm edit-user-btn" data-uid="' + u.id + '">Edit</button>' + (!isMe ? '<button class="btn btn-sm del-user-btn" style="background:var(--red-light);color:var(--red);border:1px solid #f5b4b0" data-uid="' + u.id + '">Delete</button>' : '') + '</div></td></tr>';
           }).join('')}
         </tbody>
       </table>
