@@ -299,24 +299,3 @@ def create_tag():
 def get_tags():
     return jsonify([t.to_dict() for t in Tag.query.order_by(Tag.name).all()])
 
-@articles_bp.route('/tags', methods=['POST'])
-@role_required('admin', 'qa_engineer')
-def create_tag():
-    data = request.get_json()
-    if Tag.query.filter_by(name=data['name']).first():
-        return jsonify({'error': 'Tag exists'}), 400
-    tag = Tag(name=data['name'], color=data.get('color', '#6366f1'))
-    db.session.add(tag)
-    db.session.commit()
-    return jsonify(tag.to_dict()), 201
-
-def _save_history(article, user, summary):
-    h = ArticleHistory(
-        article_id=article.id,
-        editor_id=user.id,
-        content_snapshot=article.content,
-        title_snapshot=article.title,
-        version=article.version,
-        change_summary=summary
-    )
-    db.session.add(h)
