@@ -892,7 +892,7 @@ function renderUsersPage() {
   const users = S.allUsers || [];
   const roleColors = {admin:'#ef4444',qa_engineer:'#3b82f6',developer:'#10b981',viewer:'#6366f1'};
   const getRoleColor = (role) => {
-    if (getRoleColor(role)) return getRoleColor(role);
+    if (roleColors[role]) return roleColors[role];
     // Generate consistent color from role name
     let hash = 0;
     for (let i = 0; i < role.length; i++) hash = role.charCodeAt(i) + ((hash << 5) - hash);
