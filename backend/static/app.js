@@ -250,10 +250,26 @@ function renderPage() {
 }
 
 // ??? HOME ?????????????????????????????????????????????????????????????????????
+function renderNeedsReview() {
+  const items = S.needsReview || [];
+  if (!items.length) return '';
+  return '<div style="margin-bottom:20px;padding:14px 16px;background:var(--red-light);border:1px solid var(--red);border-radius:var(--radius2)">' +
+    '<div style="font-size:12px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px">⚠️ Articles Needing Review (' + items.length + ')</div>' +
+    '<div style="display:flex;flex-direction:column;gap:6px">' +
+    items.map(a =>
+      '<div style="display:flex;align-items:center;justify-content:space-between;font-size:13px">' +
+      '<span style="color:var(--accent);cursor:pointer;text-decoration:underline" class="review-article-link" data-article="' + a.id + '">' + esc(a.title) + '</span>' +
+      '<span style="font-size:11px;color:var(--red)">Due: ' + new Date(a.review_due + 'Z').toLocaleDateString('en-PH') + '</span>' +
+      '</div>'
+    ).join('') +
+    '</div></div>';
+}
+
 function renderHome() {
   const d = S.dashboardData;
   if (!d) return `<div class="home-page"><div class="empty-state"><div class="empty-icon">📭</div><div class="empty-title">Loading...</div></div></div>`;
   return `<div class="home-page">
+    ${renderNeedsReview()}
     <div class="home-hero">
       ${S.announcement && (can('manage_users') || localStorage.getItem('wiki_ack_announcement') === String(S.announcementId)) ? `
       <div style="background:var(--yellow-light);border:1px solid var(--yellow);border-radius:var(--radius);padding:10px 16px;margin-bottom:16px;display:flex;align-items:flex-start;gap:10px;font-size:13px">
@@ -402,6 +418,7 @@ function renderReader(a) {
           ${a.last_editor && a.last_editor.id !== a.author?.id ? `<span class="article-meta-item">?? Last edited by ${esc(a.last_editor.name)}</span>` : ''}
         </div>
         <div id="article-lock-banner"></div>
+      ${a.needs_review ? '<div style="background:var(--red-light);border:1px solid var(--red);border-radius:var(--radius);padding:8px 14px;margin-bottom:14px;font-size:13px;color:var(--red);display:flex;align-items:center;gap:8px"><span>⚠️</span><strong>This article is due for review!</strong> Last reviewed: ' + relTime(a.updated_at) + '</div>' : ''}
       <div class="article-actions">
           ${(can('edit_any_article') || (can('edit_own_articles') && a.author?.id === S.user?.id)) ? `<button class="btn btn-secondary btn-sm" id="edit-this-btn" data-article="${a.id}">✏️ Edit</button>` : ''}
           ${can('publish_articles') && a.status === 'draft' ? `<button class="btn btn-success btn-sm" id="publish-btn" data-article="${a.id}">🚀 Publish</button>` : ''}
@@ -1134,6 +1151,7 @@ async function loadPermissions() {
 function can(perm) { return S.perms[perm] === true; }
 
 async function loadDashboard() {
+  try { S.needsReview = await API.get('/articles/needs-review'); } catch(e) { S.needsReview = []; }
   const [dash, ann] = await Promise.all([
     API.get('/dashboard'),
     API.get('/dashboard/announcement').catch(() => ({announcement:'', id: null}))
@@ -1478,6 +1496,11 @@ function bindPageEvents() {
     ArticleLock.stop();
   }
 
+  // Review article links
+  document.querySelectorAll('.review-article-link').forEach(el => {
+    el.addEventListener('click', () => navigateTo('read', { articleId: parseInt(el.dataset.article) }));
+  });
+
   // Announcement
   document.getElementById('set-announcement-btn')?.addEventListener('click', () => {
     showAnnouncementEditor();
@@ -1513,9 +1536,18 @@ async function saveArticle(status) {
   if (!title) { toast('Title is required', 'error'); return; }
   const tagIds = [...document.querySelectorAll('#tag-picker .tag.selected')].map(el => parseInt(el.dataset.tagId));
   const content = (typeof Editor !== 'undefined' && Editor.getValue) ? Editor.getValue() : (S._editorContent || '');
+  // Get visibility
+  const allChecked = document.getElementById('vis-all')?.checked;
+  let visibility = 'all';
+  if (!allChecked) {
+    const selected = [...document.querySelectorAll('.vis-label:not([data-slug="all"]) input')]
+      .filter(c => c.checked).map(c => c.id.replace('vis-', ''));
+    visibility = selected.length > 0 ? selected.join(',') : 'all';
+  }
   const payload = {
     title,
     content,
+    visibility,
     excerpt: document.getElementById('e-excerpt')?.value || '',
     content_type: document.getElementById('e-type')?.value || 'article',
     category_id: document.getElementById('e-cat')?.value || null,

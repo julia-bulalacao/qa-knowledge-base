@@ -76,9 +76,18 @@ class Article(db.Model):
     author = db.relationship('User', foreign_keys=[author_id], backref='articles_authored')
     last_editor = db.relationship('User', foreign_keys=[last_edited_by_id])
 
+    def _needs_review(self):
+        if not self.review_due:
+            return False
+        from datetime import datetime
+        return datetime.utcnow() >= self.review_due
+
     def _get_reactions(self):
-        yes = self.reaction_yes or 0
-        no = self.reaction_no or 0
+        try:
+            yes = self.reaction_yes or 0
+            no = self.reaction_no or 0
+        except AttributeError:
+            yes, no = 0, 0
         return {'yes': yes, 'no': no, 'total': yes + no}
 
     @property
@@ -99,6 +108,10 @@ class Article(db.Model):
             'comment_count': self.comments.count(),
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'reactions': self._get_reactions(),
+            'visibility': self.visibility or 'all',
+            'review_due': self.review_due.isoformat() if self.review_due else None,
+            'review_interval_days': self.review_interval_days or 180,
+            'needs_review': self._needs_review(),
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
             'published_at': self.published_at.isoformat() if self.published_at else None,
         }

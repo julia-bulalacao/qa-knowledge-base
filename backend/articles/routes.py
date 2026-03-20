@@ -17,6 +17,17 @@ def list_articles():
     if not has_permission(user, 'view_drafts'):
         q = q.filter_by(status='published')
 
+    # Filter by visibility - admin sees all, others see only their role's articles
+    if user.role != 'admin':
+        from sqlalchemy import or_
+        q = q.filter(
+            or_(
+                Article.visibility == 'all',
+                Article.visibility == None,
+                Article.visibility.like(f'%{user.role}%')
+            )
+        )
+
     kw = request.args.get('q')
     if kw:
         q = q.filter(or_(Article.title.ilike(f'%{kw}%'), Article.content.ilike(f'%{kw}%'), Article.excerpt.ilike(f'%{kw}%')))
@@ -249,6 +260,39 @@ def lock_status(article_id):
     from models import User
     locked_user = User.query.get(lock['user_id'])
     return jsonify({'locked': True, 'locked_by': locked_user.to_dict() if locked_user else None})
+
+
+@articles_bp.route('/needs-review', methods=['GET'])
+@login_required
+def needs_review():
+    from datetime import datetime
+    user = get_current_user()
+    q = Article.query.filter_by(status='published').filter(
+        Article.review_due != None,
+        Article.review_due <= datetime.utcnow()
+    )
+    if user.role != 'admin':
+        q = q.filter(
+            db.or_(Article.visibility == 'all', Article.visibility.like(f'%{user.role}%'))
+        )
+    articles = q.order_by(Article.review_due.asc()).all()
+    return jsonify([a.to_dict() for a in articles])
+
+@articles_bp.route('/tags', methods=['POST'])
+@login_required
+def create_tag():
+    data = request.get_json()
+    name = data.get('name', '').strip()
+    if not name:
+        return jsonify({'error': 'Name required'}), 400
+    from models import Tag
+    existing = Tag.query.filter_by(name=name).first()
+    if existing:
+        return jsonify({'id': existing.id, 'name': existing.name})
+    tag = Tag(name=name)
+    db.session.add(tag)
+    db.session.commit()
+    return jsonify({'id': tag.id, 'name': tag.name}), 201
 
 @articles_bp.route('/tags', methods=['GET'])
 @login_required
