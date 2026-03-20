@@ -1,5 +1,8 @@
-flask==3.0.0
-flask-sqlalchemy==3.1.1
-flask-bcrypt==1.0.1
-flask-cors==4.0.0
-pyjwt==2.8.0
+flask
+flask-sqlalchemy
+flask-bcrypt
+flask-cors
+pyjwt
+reportlab
+gunicorn
+psycopg2-binary

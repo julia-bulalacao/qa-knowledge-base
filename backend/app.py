@@ -7,13 +7,17 @@ def create_app():
     app = Flask(__name__, static_folder='static')
     app.config['SECRET_KEY'] = 'qa-wiki-secret-2024'
     import os
-    # Use /data/wiki.db on Render (persistent disk), local instance/ otherwise
-    if os.path.exists('/data'):
-        db_path = '/data/wiki.db'
+    # Use DATABASE_URL (PostgreSQL) if set, fallback to local SQLite
+    database_url = os.environ.get('DATABASE_URL')
+    if database_url:
+        # Fix for psycopg2 - replace postgres:// with postgresql://
+        if database_url.startswith('postgres://'):
+            database_url = database_url.replace('postgres://', 'postgresql://', 1)
+        app.config['SQLALCHEMY_DATABASE_URI'] = database_url
     else:
         db_path = os.path.join(app.instance_path, 'wiki.db')
         os.makedirs(app.instance_path, exist_ok=True)
-    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
+        app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'qa-wiki-secret-2024')
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
