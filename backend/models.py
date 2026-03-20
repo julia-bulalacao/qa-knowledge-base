@@ -11,7 +11,7 @@ class User(db.Model):
     name = db.Column(db.String(100), nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password = db.Column(db.String(200), nullable=False)
-    role = db.Column(db.String(20), nullable=False, default='viewer')
+    role = db.Column(db.String(50), nullable=False, default='viewer')
     role_slug = db.Column(db.String(50), db.ForeignKey('role.slug'), nullable=True)
     is_active = db.Column(db.Boolean, default=True)
     avatar_color = db.Column(db.String(7), default='#6366f1')
@@ -77,11 +77,8 @@ class Article(db.Model):
     last_editor = db.relationship('User', foreign_keys=[last_edited_by_id])
 
     def _get_reactions(self):
-        try:
-            yes = self.reaction_yes or 0
-            no = self.reaction_no or 0
-        except AttributeError:
-            yes, no = 0, 0
+        yes = self.reaction_yes or 0
+        no = self.reaction_no or 0
         return {'yes': yes, 'no': no, 'total': yes + no}
 
     @property

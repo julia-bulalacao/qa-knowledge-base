@@ -413,11 +413,11 @@ function renderReader(a) {
       <div class="reactions-section" style="margin-top:28px;padding:18px;background:var(--surface2);border-radius:var(--radius2);text-align:center;border:1px solid var(--border)">
         <div style="font-size:13px;font-weight:600;color:var(--text2);margin-bottom:12px">Was this article helpful?</div>
         <div style="display:flex;align-items:center;justify-content:center;gap:12px">
-          <button class="reaction-btn" id="react-yes" data-article="${a.id}" data-react="yes"
+          <button class="reaction-btn" id="react-yes" data-react="yes"
             style="display:flex;align-items:center;gap:8px;padding:8px 20px;border-radius:20px;border:1px solid var(--border);background:var(--surface);cursor:pointer;font-size:13px;font-weight:500;color:var(--text2);transition:all 0.15s">
             👍 <span id="react-yes-count">${a.reactions?.yes||0}</span>
           </button>
-          <button class="reaction-btn" id="react-no" data-article="${a.id}" data-react="no"
+          <button class="reaction-btn" id="react-no" data-react="no"
             style="display:flex;align-items:center;gap:8px;padding:8px 20px;border-radius:20px;border:1px solid var(--border);background:var(--surface);cursor:pointer;font-size:13px;font-weight:500;color:var(--text2);transition:all 0.15s">
             👎 <span id="react-no-count">${a.reactions?.no||0}</span>
           </button>
@@ -1433,22 +1433,30 @@ function bindPageEvents() {
   });
   // Reactions
   document.querySelectorAll('.reaction-btn').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const articleId = btn.dataset.article;
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const articleId = S.currentArticle?.id;
+      if (!articleId) return;
       const react = btn.dataset.react;
       const userKey = 'react_' + articleId;
       const prev = localStorage.getItem(userKey);
-      if (prev === react) return; // already reacted
+      if (prev === react) { toast('Already reacted!'); return; }
       localStorage.setItem(userKey, react);
       try {
         const res = await API.post('/articles/' + articleId + '/react', { reaction: react });
         document.getElementById('react-yes-count').textContent = res.yes || 0;
         document.getElementById('react-no-count').textContent = res.no || 0;
+        // Highlight clicked button
+        document.querySelectorAll('.reaction-btn').forEach(b => {
+          b.style.background = 'var(--surface)';
+          b.style.borderColor = 'var(--border)';
+          b.style.color = 'var(--text2)';
+        });
         btn.style.background = 'var(--accent-light)';
         btn.style.borderColor = 'var(--accent)';
         btn.style.color = 'var(--accent)';
         toast('Thanks for your feedback! 🙏');
-      } catch(e) {}
+      } catch(e) { toast('Failed to save reaction', 'error'); console.error(e); }
     });
   });
 
