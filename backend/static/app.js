@@ -72,7 +72,15 @@ function typeColor(t) {
   const colors = {sop:'#dbeafe',onboarding:'#d1fae5',bug_fix:'#fee2e2',procedure:'#ede9fe',guide:'#fef3c7',article:'#f1ede8'};
   return colors[t] || '#f1ede8';
 }
-function roleBadge(r) { return `<span class="role-badge role-${r}">${(r||'').replace('_',' ')}</span>`; }
+function roleBadge(r) {
+  const base = {admin:'Admin',qa_engineer:'QA Engineer',developer:'Developer',viewer:'Viewer'};
+  const label = base[r] || (S.allRoles||[]).find(x=>x.slug===r)?.name || (r||'').split('_').map(w=>w[0].toUpperCase()+w.slice(1)).join(' ');
+  if (['admin','qa_engineer','developer','viewer'].includes(r)) {
+    return `<span class="role-badge role-${r}">${label}</span>`;
+  }
+  const color = (S.allRoles||[]).find(x=>x.slug===r)?.color || '#6366f1';
+  return `<span class="role-badge" style="background:${color}22;color:${color};border:1px solid ${color}44">${label}</span>`;
+}
 
 // ??? MARKDOWN RENDERER ????????????????????????????????????????????????????????
 function renderMarkdown(md) {
@@ -662,7 +670,12 @@ function renderCategoryForm(cat) {
         <label>Description</label>
         <input type="text" id="c-desc" value="${esc(c.description||'')}" placeholder="What kind of articles belong here?">
       </div>
-
+      <div class="form-group">
+        <label>Icon</label>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">
+          ${CAT_ICONS.map(icon => `<div style="width:34px;height:34px;border-radius:var(--radius);display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;background:${icon===selectedIcon?'var(--accent-light)':'var(--bg2)'};border:2px solid ${icon===selectedIcon?'var(--accent)':'var(--border)'};transition:all 0.1s" class="cat-icon-pick" data-icon="${icon}">${icon}</div>`).join('')}
+        </div>
+      </div>
       <div class="form-group">
         <label>Color</label>
         <div id="cat-color-trigger" style="display:flex;align-items:center;gap:12px;margin-top:8px;padding:12px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;cursor:pointer"
@@ -673,12 +686,6 @@ function renderCategoryForm(cat) {
             <div id="cat-color-hex" style="font-size:11px;color:var(--text3);font-family:var(--mono)">${selectedColor}</div>
           </div>
           <span style="margin-left:auto;color:var(--text3);font-size:12px">▾</span>
-        </div>
-      </div>
-      <div class="form-group">
-        <label>Icon</label>
-        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">
-          ${CAT_ICONS.map(icon => `<div style="width:34px;height:34px;border-radius:var(--radius);display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;background:${icon===selectedIcon?'var(--accent-light)':'var(--bg2)'};border:2px solid ${icon===selectedIcon?'var(--accent)':'var(--border)'};transition:all 0.1s" class="cat-icon-pick" data-icon="${icon}">${icon}</div>`).join('')}
         </div>
       </div>
     </div>
@@ -735,7 +742,7 @@ function bindCategoryModalEvents() {
     const cid = document.getElementById('save-cat-btn').dataset.cid;
     const name = document.getElementById('c-name').value.trim();
     if (!name) { toast('Name is required', 'error'); return; }
-    const payload = { name, description: document.getElementById('c-desc').value.trim(), icon: selIcon, color: toHex(document.getElementById('cat-color-swatch')?.style.background) || '#3b82f6' };
+    const payload = { name, description: document.getElementById('c-desc').value.trim(), icon: selIcon, color: document.getElementById('cat-color-swatch')?.style.background || selColor };
     try {
       if (cid) { await API.put('/categories/' + cid, payload); toast('Category updated! ✅'); }
       else { await API.post('/categories', payload); toast('Category created! 🎉'); }
@@ -1023,7 +1030,7 @@ function bindUserModalEvents() {
     if (!name) { toast('Name is required', 'error'); return; }
     if (!uid && !email) { toast('Email is required', 'error'); return; }
     if (!uid && !password) { toast('Password is required', 'error'); return; }
-    const payload = { name, role, avatar_color: toHex(document.getElementById('modal-color-swatch')?.style.background || selectedColor) };
+    const payload = { name, role, avatar_color: selectedColor };
     if (!uid) payload.email = email;
     if (password) payload.password = password;
     if (uid) payload.is_active = document.getElementById('u-active')?.value === 'true';
@@ -1960,17 +1967,7 @@ function showAnnouncementModal(message, id) {
 
 
 // ─── CUSTOM COLOR PICKER ──────────────────────────────────────────────────────
-function toHex(color) {
-  if (!color) return '#6366f1';
-  color = String(color).trim();
-  if (color.startsWith('#')) return color.slice(0,7);
-  const m = color.match(/rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/i);
-  if (m) return '#' + [m[1],m[2],m[3]].map(n=>parseInt(n).toString(16).padStart(2,'0')).join('');
-  return color;
-}
-
 function showColorPicker(anchorId, currentColor, onSelect) {
-  currentColor = toHex(currentColor);
   const existing = document.getElementById('custom-color-picker');
   if (existing) { existing.remove(); return; }
 
