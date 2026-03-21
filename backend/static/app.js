@@ -78,7 +78,7 @@ function roleBadge(r) {
   if (['admin','qa_engineer','developer','viewer'].includes(r)) {
     return `<span class="role-badge role-${r}">${label}</span>`;
   }
-  const color = toHex((S.allRoles||[]).find(x=>x.slug===r)?.color) || '#6366f1';
+  const color = (S.allRoles||[]).find(x=>x.slug===r)?.color || '#6366f1';
   return `<span class="role-badge" style="background:${color}22;color:${color};border:1px solid ${color}44">${label}</span>`;
 }
 
@@ -742,7 +742,7 @@ function bindCategoryModalEvents() {
     const cid = document.getElementById('save-cat-btn').dataset.cid;
     const name = document.getElementById('c-name').value.trim();
     if (!name) { toast('Name is required', 'error'); return; }
-    const payload = { name, description: document.getElementById('c-desc').value.trim(), icon: selIcon, color: toHex(document.getElementById('cat-color-swatch')?.style.background) || '#3b82f6' };
+    const payload = { name, description: document.getElementById('c-desc').value.trim(), icon: selIcon, color: document.getElementById('cat-color-swatch')?.style.background || selColor };
     try {
       if (cid) { await API.put('/categories/' + cid, payload); toast('Category updated! ✅'); }
       else { await API.post('/categories', payload); toast('Category created! 🎉'); }
@@ -916,7 +916,7 @@ function renderUsersPage() {
     if (roleColors[role]) return roleColors[role];
     // Check S.allRoles for custom role color
     const customRole = (S.allRoles||[]).find(r => r.slug === role || r.name?.toLowerCase() === role?.toLowerCase());
-    if (customRole?.color) return toHex(customRole.color);
+    if (customRole?.color) return customRole.color;
     // Fallback: generate consistent color from role name
     let hash = 0;
     for (let i = 0; i < (role||'').length; i++) hash = role.charCodeAt(i) + ((hash << 5) - hash);
@@ -1030,7 +1030,7 @@ function bindUserModalEvents() {
     if (!name) { toast('Name is required', 'error'); return; }
     if (!uid && !email) { toast('Email is required', 'error'); return; }
     if (!uid && !password) { toast('Password is required', 'error'); return; }
-    const payload = { name, role, avatar_color: toHex(document.getElementById('modal-color-swatch')?.style.background || selectedColor) };
+    const payload = { name, role, avatar_color: selectedColor };
     if (!uid) payload.email = email;
     if (password) payload.password = password;
     if (uid) payload.is_active = document.getElementById('u-active')?.value === 'true';
@@ -1232,7 +1232,32 @@ async function loadArticles(extraFilters = {}) {
 }
 
 // ─── NAVIGATION ───────────────────────────────────────────────────────────────
+
+// ─── PAGE LOADER ──────────────────────────────────────────────────────────────
+function showPageLoader(msg = 'Loading...') {
+  let el = document.getElementById('page-loader');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'page-loader';
+    document.body.appendChild(el);
+  }
+  el.innerHTML = `
+    <div class="page-loader-inner">
+      <div class="page-loader-spinner"></div>
+      <div class="page-loader-msg">${msg}</div>
+    </div>`;
+  el.style.display = 'flex';
+  requestAnimationFrame(() => el.classList.add('visible'));
+}
+function hidePageLoader() {
+  const el = document.getElementById('page-loader');
+  if (!el) return;
+  el.classList.remove('visible');
+  setTimeout(() => { el.style.display = 'none'; }, 200);
+}
+
 async function navigateTo(page, opts = {}) {
+  showPageLoader();
   // Fade out content area
   const pb = document.getElementById('page-body');
   if (pb && S.page !== page) {
@@ -1261,6 +1286,7 @@ async function navigateTo(page, opts = {}) {
   if (page === 'categories') { await loadMeta(); }
   if (page === 'tags') { S.tags = await API.get('/articles/tags'); }
   render();
+  hidePageLoader();
   // Fade content back in
   requestAnimationFrame(() => {
     const pb2 = document.getElementById('page-body');
@@ -1696,6 +1722,7 @@ function bindLoginEvents() {
 }
 
 async function doLogin() {
+  showPageLoader('Signing in...');
   try {
     const data = await API.post('/auth/login', {
       email: document.getElementById('l-email').value,
@@ -1705,6 +1732,7 @@ async function doLogin() {
     S.page = 'home'; S.currentArticle = null; S.currentCategoryId = null;
     localStorage.setItem('wiki_token', data.token);
     await Promise.all([loadDashboard(), loadMeta(), loadPermissions()]);
+    hidePageLoader();
     render();
     // Show announcement modal if unacknowledged
     if (S.announcement && S.announcementId) {
@@ -1714,7 +1742,7 @@ async function doLogin() {
         setTimeout(() => showAnnouncementModal(S.announcement, S.announcementId), 600);
       }
     }
-  } catch(e) { S.loginError = e.message; render(); }
+  } catch(e) { hidePageLoader(); S.loginError = e.message; render(); }
 }
 
 function debounce(fn, ms) {
@@ -1967,17 +1995,7 @@ function showAnnouncementModal(message, id) {
 
 
 // ─── CUSTOM COLOR PICKER ──────────────────────────────────────────────────────
-function toHex(color) {
-  if (!color) return '#6366f1';
-  color = String(color).trim();
-  if (color.startsWith('#')) return color.slice(0,7);
-  const m = color.match(/rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
-  if (m) return '#' + [m[1],m[2],m[3]].map(n=>parseInt(n).toString(16).padStart(2,'0')).join('');
-  return color;
-}
-
 function showColorPicker(anchorId, currentColor, onSelect) {
-  currentColor = toHex(currentColor);
   const existing = document.getElementById('custom-color-picker');
   if (existing) { existing.remove(); return; }
 
