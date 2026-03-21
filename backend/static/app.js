@@ -734,7 +734,7 @@ function bindCategoryModalEvents() {
     const cid = document.getElementById('save-cat-btn').dataset.cid;
     const name = document.getElementById('c-name').value.trim();
     if (!name) { toast('Name is required', 'error'); return; }
-    const payload = { name, description: document.getElementById('c-desc').value.trim(), icon: selIcon, color: document.getElementById('cat-color-swatch')?.style.background || selColor };
+    const payload = { name, description: document.getElementById('c-desc').value.trim(), icon: selIcon, color: toHex(document.getElementById('cat-color-swatch')?.style.background) || '#3b82f6' };
     try {
       if (cid) { await API.put('/categories/' + cid, payload); toast('Category updated! ✅'); }
       else { await API.post('/categories', payload); toast('Category created! 🎉'); }
@@ -888,7 +888,7 @@ function bindRoleModalEvents() {
     const payload = {
       name,
       description: document.getElementById('r-desc').value.trim(),
-      color: document.getElementById('role-color-swatch')?.style.background || '#6366f1',
+      color: toHex(document.getElementById('role-color-swatch')?.style.background) || '#6366f1',
       permissions
     };
     try {
@@ -1022,7 +1022,7 @@ function bindUserModalEvents() {
     if (!name) { toast('Name is required', 'error'); return; }
     if (!uid && !email) { toast('Email is required', 'error'); return; }
     if (!uid && !password) { toast('Password is required', 'error'); return; }
-    const payload = { name, role, avatar_color: selectedColor };
+    const payload = { name, role, avatar_color: toHex(document.getElementById('modal-color-swatch')?.style.background || selectedColor) };
     if (!uid) payload.email = email;
     if (password) payload.password = password;
     if (uid) payload.is_active = document.getElementById('u-active')?.value === 'true';
@@ -1959,19 +1959,7 @@ function showAnnouncementModal(message, id) {
 
 
 // ─── CUSTOM COLOR PICKER ──────────────────────────────────────────────────────
-function toHex(color) {
-  if (!color) return '#6366f1';
-  if (color.startsWith('#')) return color.slice(0,7);
-  // Convert rgb() to hex
-  const m = color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
-  if (m) {
-    return '#' + [m[1],m[2],m[3]].map(n => parseInt(n).toString(16).padStart(2,'0')).join('');
-  }
-  return color;
-}
-
 function showColorPicker(anchorId, currentColor, onSelect) {
-  currentColor = toHex(currentColor);
   const existing = document.getElementById('custom-color-picker');
   if (existing) { existing.remove(); return; }
 
@@ -2049,14 +2037,14 @@ function showColorPicker(anchorId, currentColor, onSelect) {
 
   // Native color input
   document.getElementById('cp-native').addEventListener('input', (e) => {
-    selected = toHex(e.target.value);
+    selected = e.target.value;
     document.getElementById('cp-preview').style.background = selected;
     document.getElementById('cp-hex-input').value = selected.replace('#','');
   });
 
   // Apply
   document.getElementById('cp-apply').addEventListener('click', () => {
-    onSelect(toHex(selected));
+    onSelect(selected);
     picker.remove();
   });
 
