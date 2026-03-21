@@ -1959,7 +1959,19 @@ function showAnnouncementModal(message, id) {
 
 
 // ─── CUSTOM COLOR PICKER ──────────────────────────────────────────────────────
+function toHex(color) {
+  if (!color) return '#6366f1';
+  if (color.startsWith('#')) return color.slice(0,7);
+  // Convert rgb() to hex
+  const m = color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+  if (m) {
+    return '#' + [m[1],m[2],m[3]].map(n => parseInt(n).toString(16).padStart(2,'0')).join('');
+  }
+  return color;
+}
+
 function showColorPicker(anchorId, currentColor, onSelect) {
+  currentColor = toHex(currentColor);
   const existing = document.getElementById('custom-color-picker');
   if (existing) { existing.remove(); return; }
 
@@ -2037,14 +2049,14 @@ function showColorPicker(anchorId, currentColor, onSelect) {
 
   // Native color input
   document.getElementById('cp-native').addEventListener('input', (e) => {
-    selected = e.target.value;
+    selected = toHex(e.target.value);
     document.getElementById('cp-preview').style.background = selected;
     document.getElementById('cp-hex-input').value = selected.replace('#','');
   });
 
   // Apply
   document.getElementById('cp-apply').addEventListener('click', () => {
-    onSelect(selected);
+    onSelect(toHex(selected));
     picker.remove();
   });
 
