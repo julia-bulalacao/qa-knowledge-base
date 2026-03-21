@@ -888,7 +888,7 @@ function bindRoleModalEvents() {
     const payload = {
       name,
       description: document.getElementById('r-desc').value.trim(),
-      color: toHex(document.getElementById('role-color-swatch')?.style.background) || '#6366f1',
+      color: document.getElementById('role-color-swatch')?.style.background || '#6366f1',
       permissions
     };
     try {
@@ -1959,7 +1959,17 @@ function showAnnouncementModal(message, id) {
 
 
 // ─── CUSTOM COLOR PICKER ──────────────────────────────────────────────────────
+function toHex(color) {
+  if (!color) return '#6366f1';
+  color = String(color).trim();
+  if (color.startsWith('#')) return color.slice(0,7);
+  const m = color.match(/rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/);
+  if (m) return '#' + [m[1],m[2],m[3]].map(n=>parseInt(n).toString(16).padStart(2,'0')).join('');
+  return color;
+}
+
 function showColorPicker(anchorId, currentColor, onSelect) {
+  currentColor = toHex(currentColor);
   const existing = document.getElementById('custom-color-picker');
   if (existing) { existing.remove(); return; }
 
