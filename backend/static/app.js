@@ -893,9 +893,12 @@ function renderUsersPage() {
   const roleColors = {admin:'#ef4444',qa_engineer:'#3b82f6',developer:'#10b981',viewer:'#6366f1'};
   const getRoleColor = (role) => {
     if (roleColors[role]) return roleColors[role];
-    // Generate consistent color from role name
+    // Check S.allRoles for custom role color
+    const customRole = (S.allRoles||[]).find(r => r.slug === role || r.name?.toLowerCase() === role?.toLowerCase());
+    if (customRole?.color) return customRole.color;
+    // Fallback: generate consistent color from role name
     let hash = 0;
-    for (let i = 0; i < role.length; i++) hash = role.charCodeAt(i) + ((hash << 5) - hash);
+    for (let i = 0; i < (role||'').length; i++) hash = role.charCodeAt(i) + ((hash << 5) - hash);
     const colors = ['#f59e0b','#8b5cf6','#ec4899','#14b8a6','#f97316','#06b6d4','#84cc16','#a855f7'];
     return colors[Math.abs(hash) % colors.length];
   };
@@ -1576,6 +1579,31 @@ function bindEditorEvents() {
   document.querySelectorAll('#tag-picker .tag').forEach(el => {
     el.addEventListener('click', () => el.classList.toggle('selected'));
   });
+
+  // Add new tag inline
+  document.getElementById('add-tag-btn')?.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    const name = await showPrompt({ title: 'New Tag', message: 'Enter tag name:', placeholder: 'e.g. robot-framework', confirmText: 'Create' });
+    if (!name?.trim()) return;
+    try {
+      const newTag = await API.post('/articles/tags', { name: name.trim() });
+      if (!S.tags) S.tags = [];
+      if (!S.tags.find(t => t.id === newTag.id)) S.tags.push(newTag);
+      const picker = document.getElementById('tag-picker');
+      if (picker) {
+        const selected = [...picker.querySelectorAll('.tag.selected')].map(el => parseInt(el.dataset.tagId));
+        selected.push(newTag.id);
+        picker.innerHTML = S.tags.map(t =>
+          '<span class="tag ' + (selected.includes(t.id) ? 'selected' : '') + '" data-tag-id="' + t.id + '">' + esc(t.name) + '</span>'
+        ).join('') + '<span id="add-tag-btn" style="display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:4px;border:1px dashed var(--border);font-size:12px;color:var(--text3);cursor:pointer">+ New Tag</span>';
+        picker.querySelectorAll('.tag').forEach(el => el.addEventListener('click', () => el.classList.toggle('selected')));
+        // Rebind add-tag-btn
+        picker.querySelector('#add-tag-btn')?.addEventListener('click', arguments.callee);
+      }
+      toast('Tag created! 🏷️');
+    } catch(e) { toast('Failed to create tag', 'error'); }
+  });
+
   document.getElementById('save-draft-btn')?.addEventListener('click', () => saveArticle('draft'));
   document.getElementById('publish-article-btn')?.addEventListener('click', () => saveArticle('published'));
   const backBtn = document.getElementById('back-btn');
