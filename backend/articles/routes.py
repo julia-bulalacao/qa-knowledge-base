@@ -27,8 +27,7 @@ def list_articles():
     q = Article.query.options(
         joinedload(Article.author),
         joinedload(Article.category),
-        joinedload(Article.tags),
-        joinedload(Article.comments)
+        joinedload(Article.tags)
     )
 
     # Check view_drafts permission from DB
