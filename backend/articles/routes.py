@@ -32,16 +32,19 @@ def list_articles():
     # Filter by visibility - admin sees all, others see only their role's articles
     if user.role != 'admin':
         try:
-            from sqlalchemy import or_
-            q = q.filter(
-                or_(
-                    Article.visibility == 'all',
-                    Article.visibility == None,
-                    Article.visibility.like(f'%{user.role}%')
-                )
-            )
-        except AttributeError:
-            pass  # visibility column not available yet
+            user_role = user.role_slug or user.role
+            # Get visible article IDs using raw SQL to bypass SQLAlchemy cache
+            from sqlalchemy import text as sqlt
+            result = db.session.execute(sqlt(
+                "SELECT id FROM article WHERE visibility IS NULL OR visibility = '' "
+                "OR visibility = 'all' OR visibility LIKE :role_pattern"
+            ), {'role_pattern': f'%{user_role}%'})
+            visible_ids = [row[0] for row in result]
+            q = q.filter(Article.id.in_(visible_ids))
+            print(f"[DEBUG] Visible article IDs for {user_role}: {visible_ids}")
+        except Exception as e:
+            print(f"[DEBUG] Visibility filter error: {e}")
+            pass
 
     kw = request.args.get('q')
     if kw:
@@ -65,6 +68,7 @@ def list_articles():
 
     pinned_first = q.filter_by(is_pinned=True).order_by(Article.updated_at.desc()).all()
     rest = q.filter_by(is_pinned=False).order_by(Article.updated_at.desc()).all()
+    print(f"[DEBUG] Articles returned: {[(a.id, a.title[:20], getattr(a,'visibility','N/A')) for a in pinned_first+rest]}")
 
     page = int(request.args.get('page', 1))
     per_page = int(request.args.get('per_page', 20))
@@ -167,6 +171,31 @@ def update_article(article_id):
         if f in data:
             setattr(article, f, data[f])
 
+    # Visibility - explicit set with SQL to bypass SQLAlchemy cache
+    if 'visibility' in data:
+        print(f"[DEBUG] Saving visibility: {data['visibility']} for article {article.id}")
+        try:
+            from sqlalchemy import text
+            db.session.execute(
+                text('UPDATE article SET visibility = :v WHERE id = :id'),
+                {'v': data['visibility'], 'id': article.id}
+            )
+            print(f"[DEBUG] Visibility SQL executed successfully")
+        except Exception as e:
+            print(f"[DEBUG] Visibility save error: {e}")
+
+    # Review reminder - direct date
+    if 'review_due_date' in data:
+        try:
+            date_str = data['review_due_date']
+            if date_str:
+                from datetime import datetime as dt
+                article.review_due = dt.strptime(date_str, '%Y-%m-%d')
+            else:
+                article.review_due = None
+        except (AttributeError, TypeError, ValueError):
+            pass
+
     if 'status' in data:
         if data['status'] == 'published' and not has_permission(user, 'publish_articles'):
             return jsonify({'error': 'You do not have permission to publish articles'}), 403
@@ -217,20 +246,6 @@ def export_pdf(article_id):
     )
 
 
-@articles_bp.route('/<int:article_id>/react', methods=['POST'])
-@login_required
-def react_article(article_id):
-    article = Article.query.get_or_404(article_id)
-    data = request.get_json()
-    reaction = data.get('reaction')
-    if reaction not in ('yes', 'no'):
-        return jsonify({'error': 'Invalid reaction'}), 400
-    if reaction == 'yes':
-        article.reaction_yes = (article.reaction_yes or 0) + 1
-    else:
-        article.reaction_no = (article.reaction_no or 0) + 1
-    db.session.commit()
-    return jsonify(article._get_reactions())
 
 # Simple in-memory lock store (resets on server restart - sufficient for small teams)
 _article_locks = {}
@@ -277,24 +292,6 @@ def lock_status(article_id):
     return jsonify({'locked': True, 'locked_by': locked_user.to_dict() if locked_user else None})
 
 
-@articles_bp.route('/needs-review', methods=['GET'])
-@login_required
-def needs_review():
-    try:
-        from datetime import datetime
-        user = get_current_user()
-        q = Article.query.filter_by(status='published').filter(
-            Article.review_due != None,
-            Article.review_due <= datetime.utcnow()
-        )
-        if user.role != 'admin':
-            q = q.filter(
-                db.or_(Article.visibility == 'all', Article.visibility.like(f'%{user.role}%'))
-            )
-        articles = q.order_by(Article.review_due.asc()).all()
-        return jsonify([a.to_dict() for a in articles])
-    except Exception:
-        return jsonify([])
 
 @articles_bp.route('/tags', methods=['POST'])
 @login_required
@@ -316,4 +313,35 @@ def create_tag():
 @login_required
 def get_tags():
     return jsonify([t.to_dict() for t in Tag.query.order_by(Tag.name).all()])
+
+@articles_bp.route('/tags/<int:tag_id>', methods=['PUT'])
+@login_required
+def update_tag(tag_id):
+    from utils import has_permission
+    user = get_current_user()
+    if not has_permission(user, 'manage_categories'):
+        return jsonify({'error': 'No permission'}), 403
+    tag = Tag.query.get_or_404(tag_id)
+    data = request.get_json()
+    name = data.get('name', '').strip()
+    if not name:
+        return jsonify({'error': 'Name required'}), 400
+    existing = Tag.query.filter(Tag.name == name, Tag.id != tag_id).first()
+    if existing:
+        return jsonify({'error': 'Tag already exists'}), 400
+    tag.name = name
+    db.session.commit()
+    return jsonify({'id': tag.id, 'name': tag.name})
+
+@articles_bp.route('/tags/<int:tag_id>', methods=['DELETE'])
+@login_required
+def delete_tag(tag_id):
+    from utils import has_permission
+    user = get_current_user()
+    if not has_permission(user, 'manage_categories'):
+        return jsonify({'error': 'No permission'}), 403
+    tag = Tag.query.get_or_404(tag_id)
+    db.session.delete(tag)
+    db.session.commit()
+    return jsonify({'message': 'Tag deleted'})
 

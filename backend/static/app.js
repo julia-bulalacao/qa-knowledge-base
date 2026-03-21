@@ -149,68 +149,76 @@ function renderSidebar() {
       </div>
     </div>
     <div class="sidebar-body">
+
+      <!-- Main Navigation -->
+      <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text3);padding:4px 8px 2px">Navigation</div>
       <div class="nav-item ${S.page==='home'?'active':''}" data-page="home">
         <span class="nav-icon">🏠</span><span>Home</span>
       </div>
       <div class="nav-item ${S.page==='all'?'active':''}" data-page="all">
         <span class="nav-icon">📄</span><span>All Articles</span>
       </div>
-      ${(can('create_articles')||can('edit_own_articles')) ? `<div class="nav-item ${S.page==='drafts'?'active':''}" data-page="drafts">
+      ${(can('create_articles')||can('edit_own_articles')) ? `
+      <div class="nav-item ${S.page==='drafts'?'active':''}" data-page="drafts">
         <span class="nav-icon">✏️</span><span>My Drafts</span>
       </div>` : ''}
+
+      <!-- Content -->
       ${can('manage_categories') ? `
       <div class="nav-divider"></div>
+      <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text3);padding:4px 8px 2px">Organize</div>
       <div class="nav-item ${S.page==='categories'?'active':''}" data-page="categories">
         <span class="nav-icon">📂</span><span>Categories</span>
+      </div>
+      <div class="nav-item ${S.page==='tags'?'active':''}" data-page="tags">
+        <span class="nav-icon">🏷️</span><span>Tags</span>
       </div>` : ''}
+
+      <!-- Admin -->
       ${can('manage_users') ? `
       <div class="nav-divider"></div>
-      <div class="nav-section-label" style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text3);padding:4px 8px 2px">Admin</div>
+      <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text3);padding:4px 8px 2px">Admin</div>
       <div class="nav-item ${S.page==='users'?'active':''}" data-page="users">
         <span class="nav-icon">👥</span><span>Users</span>
       </div>
       <div class="nav-item ${S.page==='roles'?'active':''}" data-page="roles">
         <span class="nav-icon">🔒</span><span>Roles</span>
       </div>` : ''}
-      <div class="nav-item" id="mobile-dark-toggle" style="display:none">
+
+      <!-- Mobile dark mode toggle -->
+      <div class="nav-item" id="mobile-dark-toggle" onclick="toggleDarkMode()">
         <span class="nav-icon">${S.darkMode ? '☀️' : '🌙'}</span><span>${S.darkMode ? 'Light' : 'Dark'}</span>
       </div>
+
+      <!-- Categories list -->
+      ${(S.categories||[]).length ? `
       <div class="nav-divider"></div>
-      <div class="sidebar-section">
-        <div class="sidebar-section-header" id="cats-toggle">
-          <div class="sidebar-section-title"><span>📂</span><span>Categories</span></div>
-          <span class="sidebar-section-toggle open" id="cats-arrow">›</span>
-        </div>
-        <div class="sidebar-section-items" id="cats-list">
-          ${(S.categories||[]).map(cat => `
-            <div class="sidebar-cat ${S.currentCategoryId===cat.id?'active':''}" data-cat="${cat.id}">
-              <span class="cat-icon">${cat.icon}</span>
-              <span>${esc(cat.name)}</span>
-              <span class="cat-count">${cat.article_count}</span>
-            </div>`).join('')}
-        </div>
-      </div>
+      <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text3);padding:4px 8px 2px">Categories</div>
+      ${(S.categories||[]).map(c => `
+        <div class="sidebar-cat ${S.currentCategoryId===c.id?'active':''}" data-cat="${c.id}">
+          <span class="cat-icon">${c.icon}</span>
+          <span>${esc(c.name)}</span>
+        </div>`).join('')}` : ''}
+
     </div>
     <div class="sidebar-footer">
-      <div class="user-pill" data-page="profile">
-        ${avatar(S.user, 30)}
+      <div class="user-pill" id="profile-btn" style="cursor:pointer" title="My Profile" onclick="if(!event.target.closest('#dark-toggle'))navigateTo('profile')">
+        ${avatar(S.user, 28)}
         <div class="user-info">
-          <div class="user-name">${esc(S.user.name)}</div>
-          <div class="user-role">${S.user.role?.replace('_',' ')}</div>
+          <div style="font-weight:600;font-size:12px">${esc(S.user?.name||'')}</div>
+          <div style="font-size:10px;color:var(--text3);text-transform:capitalize">${S.user?.role?.replace('_',' ')||''}</div>
+        </div>
+        <div id="dark-toggle" style="width:32px;height:18px;border-radius:9px;background:${S.darkMode?'var(--accent)':'var(--border)'};cursor:pointer;position:relative;transition:background 0.2s;flex-shrink:0;margin-left:auto" onclick="event.stopPropagation();toggleDarkMode()">
+          <div style="position:absolute;top:3px;${S.darkMode?'right:3px':'left:3px'};width:12px;height:12px;border-radius:50%;background:white;transition:all 0.2s"></div>
         </div>
       </div>
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;margin-bottom:2px">
-        <span style="font-size:12px;color:var(--text3)">Dark Mode</span>
-        <div id="dark-toggle" style="width:36px;height:20px;border-radius:10px;background:${S.darkMode?'var(--accent)':'var(--border)'};cursor:pointer;position:relative;transition:background 0.2s;flex-shrink:0" title="Toggle dark mode">
-          <div style="position:absolute;top:2px;left:${S.darkMode?'16px':'2px'};width:16px;height:16px;border-radius:50%;background:white;transition:left 0.2s;box-shadow:0 1px 3px rgba(0,0,0,0.3)"></div>
-        </div>
-      </div>
+
       <div class="sign-out" id="logout-btn">Sign out</div>
     </div>
   </div>`;
 }
 
-// ??? TOPBAR ???????????????????????????????????????????????????????????????????
+
 function renderTopbar() {
   const canCreate = ['admin','qa_engineer','developer'].includes(S.user?.role);
   const pages = { home:'Home', all:'All Articles', drafts:'My Drafts', profile:'Profile', read:'Reading', edit:'Editor' };
@@ -245,31 +253,17 @@ function renderPage() {
     case 'users': return renderUsersPage();
     case 'roles': return renderRolesPage();
     case 'categories': return renderCategoriesPage();
+    case 'tags': return renderTagsPage();
     default: return renderHome();
   }
 }
 
 // ??? HOME ?????????????????????????????????????????????????????????????????????
-function renderNeedsReview() {
-  const items = S.needsReview || [];
-  if (!items.length) return '';
-  return '<div style="margin-bottom:20px;padding:14px 16px;background:var(--red-light);border:1px solid var(--red);border-radius:var(--radius2)">' +
-    '<div style="font-size:12px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px">⚠️ Articles Needing Review (' + items.length + ')</div>' +
-    '<div style="display:flex;flex-direction:column;gap:6px">' +
-    items.map(a =>
-      '<div style="display:flex;align-items:center;justify-content:space-between;font-size:13px">' +
-      '<span style="color:var(--accent);cursor:pointer;text-decoration:underline" class="review-article-link" data-article="' + a.id + '">' + esc(a.title) + '</span>' +
-      '<span style="font-size:11px;color:var(--red)">Due: ' + new Date(a.review_due + 'Z').toLocaleDateString('en-PH') + '</span>' +
-      '</div>'
-    ).join('') +
-    '</div></div>';
-}
 
 function renderHome() {
   const d = S.dashboardData;
   if (!d) return `<div class="home-page"><div class="empty-state"><div class="empty-icon">📭</div><div class="empty-title">Loading...</div></div></div>`;
   return `<div class="home-page">
-    ${renderNeedsReview()}
     <div class="home-hero">
       ${S.announcement && (can('manage_users') || localStorage.getItem('wiki_ack_announcement') === String(S.announcementId)) ? `
       <div style="background:var(--yellow-light);border:1px solid var(--yellow);border-radius:var(--radius);padding:10px 16px;margin-bottom:16px;display:flex;align-items:flex-start;gap:10px;font-size:13px">
@@ -284,14 +278,20 @@ function renderHome() {
       <h1>👋 Welcome, ${esc(S.user.name.split(' ')[0])}!</h1>
       <p>Your team's living documentation hub —SOPs, onboarding guides, bug fixes, and more.</p>
     </div>
-    <div class="stats-row">
+    <div class="stats-row" style="grid-template-columns:repeat(3,1fr)">
       <div class="stat-box"><div class="stat-num">${d.total_articles}</div><div class="stat-lbl">Published</div></div>
       <div class="stat-box"><div class="stat-num">${d.draft_articles}</div><div class="stat-lbl">Drafts</div></div>
       <div class="stat-box"><div class="stat-num">${d.total_categories}</div><div class="stat-lbl">Categories</div></div>
-      <div class="stat-box"><div class="stat-num">${d.total_tags}</div><div class="stat-lbl">Tags</div></div>
+
     </div>
     <div class="section-title">Browse by Category</div>
     <div class="category-grid">
+      <div class="cat-card" style="cursor:pointer" onclick="navigateTo('all')">
+        <div class="cat-card-icon">📋</div>
+        <div class="cat-card-name">All Articles</div>
+        <div class="cat-card-desc">Browse all published articles</div>
+        <div class="cat-card-count">${S.dashboardData?.total_articles||0} article${(S.dashboardData?.total_articles||0)!==1?'s':''}</div>
+      </div>
       ${(S.categories||[]).map(c=>`
         <div class="cat-card" data-cat="${c.id}">
           <div class="cat-card-icon">${c.icon}</div>
@@ -418,7 +418,7 @@ function renderReader(a) {
           ${a.last_editor && a.last_editor.id !== a.author?.id ? `<span class="article-meta-item">?? Last edited by ${esc(a.last_editor.name)}</span>` : ''}
         </div>
         <div id="article-lock-banner"></div>
-      ${a.needs_review ? '<div style="background:var(--red-light);border:1px solid var(--red);border-radius:var(--radius);padding:8px 14px;margin-bottom:14px;font-size:13px;color:var(--red);display:flex;align-items:center;gap:8px"><span>⚠️</span><strong>This article is due for review!</strong> Last reviewed: ' + relTime(a.updated_at) + '</div>' : ''}
+      
       <div class="article-actions">
           ${(can('edit_any_article') || (can('edit_own_articles') && a.author?.id === S.user?.id)) ? `<button class="btn btn-secondary btn-sm" id="edit-this-btn" data-article="${a.id}">✏️ Edit</button>` : ''}
           ${can('publish_articles') && a.status === 'draft' ? `<button class="btn btn-success btn-sm" id="publish-btn" data-article="${a.id}">🚀 Publish</button>` : ''}
@@ -427,20 +427,7 @@ function renderReader(a) {
         </div>
       </div>
       <div class="article-content">${renderMarkdown(a.content)}</div>
-      <div class="reactions-section" style="margin-top:28px;padding:18px;background:var(--surface2);border-radius:var(--radius2);text-align:center;border:1px solid var(--border)">
-        <div style="font-size:13px;font-weight:600;color:var(--text2);margin-bottom:12px">Was this article helpful?</div>
-        <div style="display:flex;align-items:center;justify-content:center;gap:12px">
-          <button class="reaction-btn" id="react-yes" data-react="yes"
-            style="display:flex;align-items:center;gap:8px;padding:8px 20px;border-radius:20px;border:1px solid var(--border);background:var(--surface);cursor:pointer;font-size:13px;font-weight:500;color:var(--text2);transition:all 0.15s">
-            👍 <span id="react-yes-count">${a.reactions?.yes||0}</span>
-          </button>
-          <button class="reaction-btn" id="react-no" data-react="no"
-            style="display:flex;align-items:center;gap:8px;padding:8px 20px;border-radius:20px;border:1px solid var(--border);background:var(--surface);cursor:pointer;font-size:13px;font-weight:500;color:var(--text2);transition:all 0.15s">
-            👎 <span id="react-no-count">${a.reactions?.no||0}</span>
-          </button>
-        </div>
-        ${a.reactions?.total ? `<div style="font-size:11px;color:var(--text4);margin-top:8px">${a.reactions.yes} of ${a.reactions.total} found this helpful</div>` : ''}
-      </div>
+      
       <div class="comments-section">
         <div class="comments-title">💬 Comments (${a.comments?.length||0})</div>
         ${a.comments?.length ? a.comments.map(c=>`
@@ -462,6 +449,9 @@ function renderReader(a) {
         </div>` : ''}
       </div>
     </div>
+    <!-- Floating info button for mobile -->
+    <button id="mobile-info-btn" onclick="var p=document.getElementById('mobile-info-panel');var open=p.dataset.open==='1';if(open){p.style.opacity='0';p.style.transform='translateY(8px) scale(0.97)';setTimeout(function(){p.style.display='none';p.dataset.open='0';},180);}else{p.style.display='block';p.dataset.open='1';requestAnimationFrame(function(){p.style.opacity='1';p.style.transform='translateY(0) scale(1)';});}this.classList.toggle('info-btn-active',!open);" style="position:fixed;bottom:70px;right:16px;z-index:200;width:42px;height:42px;border-radius:50%;background:var(--surface);border:1px solid var(--border);box-shadow:0 2px 16px rgba(0,0,0,0.18);cursor:pointer;display:none;align-items:center;justify-content:center;transition:background 0.15s,color 0.15s,border-color 0.15s"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="8" r="0.5" fill="currentColor"/><line x1="12" y1="12" x2="12" y2="16"/></svg></button>
+    <div id="mobile-info-panel" data-open="0" style="display:none;position:fixed;bottom:122px;right:16px;z-index:199;width:264px;background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,0.14);overflow-y:auto;max-height:62vh;padding:16px;opacity:0;transform:translateY(8px) scale(0.97);transition:opacity 0.18s ease,transform 0.18s ease"></div>
     <div class="reader-aside">
       <div class="aside-section">
         <div class="aside-title">Article Info</div>
@@ -560,16 +550,7 @@ function renderEditor() {
         <span id="add-tag-btn" style="display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:4px;border:1px dashed var(--border);font-size:12px;color:var(--text3);cursor:pointer">+ New Tag</span>
       </div>
     </div>
-    <div class="form-group">
-      <label>Review Reminder</label>
-      <select id="e-review-interval" style="width:100%">
-        <option value="0" ${(!a?.review_interval_days||a?.review_interval_days==0)?'selected':''}>No reminder</option>
-        <option value="30" ${a?.review_interval_days==30?'selected':''}>1 month</option>
-        <option value="90" ${a?.review_interval_days==90?'selected':''}>3 months</option>
-        <option value="180" ${a?.review_interval_days==180?'selected':''}>6 months</option>
-        <option value="365" ${a?.review_interval_days==365?'selected':''}>1 year</option>
-      </select>
-    </div>
+
     <div class="form-group">
       <label>Visibility</label>
       <div style="display:flex;flex-wrap:wrap;gap:8px" id="vis-picker">
@@ -593,6 +574,30 @@ function renderEditor() {
 }
 
 
+
+// ─── TAGS PAGE ────────────────────────────────────────────────────────────────
+function renderTagsPage() {
+  const tags = (S.tags || []).slice().sort((a,b) => a.name.localeCompare(b.name));
+  return `<div style="max-width:700px;margin:0 auto;padding:28px 24px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">
+      <div>
+        <h2 style="font-size:20px;font-weight:700;color:var(--text);margin:0">🏷️ Tags</h2>
+        <div style="font-size:13px;color:var(--text3);margin-top:4px">${tags.length} tag${tags.length!==1?'s':''}</div>
+      </div>
+      <button class="btn btn-primary" id="add-tag-page-btn">+ New Tag</button>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius2);overflow:hidden">
+      ${tags.length ? tags.map((t,i) => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;${i>0?'border-top:1px solid var(--border)':''}">
+          <span style="font-size:14px;color:var(--text)">${esc(t.name)}</span>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-secondary btn-sm edit-tag-btn" data-tag-id="${t.id}" data-tag-name="${esc(t.name)}">✏️ Edit</button>
+            <button class="btn btn-sm del-tag-btn" style="background:var(--red-light);color:var(--red);border:1px solid #f5b4b0" data-tag-id="${t.id}" data-tag-name="${esc(t.name)}">✕ Delete</button>
+          </div>
+        </div>`).join('') : '<div style="padding:48px;text-align:center;color:var(--text3)">No tags yet. Create your first tag!</div>'}
+    </div>
+  </div>`;
+}
 
 // ─── USERS PAGE ───────────────────────────────────────────────────────────────
 
@@ -665,8 +670,14 @@ function renderCategoryForm(cat) {
       </div>
       <div class="form-group">
         <label>Color</label>
-        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px">
-          ${CAT_COLORS.map(col => `<div style="width:26px;height:26px;border-radius:50%;background:${col};cursor:pointer;border:3px solid ${col===selectedColor?'var(--text)':'transparent'};transition:all 0.1s" class="cat-color-pick" data-color="${col}"></div>`).join('')}
+        <div id="cat-color-trigger" style="display:flex;align-items:center;gap:12px;margin-top:8px;padding:12px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;cursor:pointer"
+          onclick="showColorPicker('cat-color-trigger', document.getElementById('cat-color-swatch')?.style.background||'${selectedColor}', (c) => { document.getElementById('cat-color-swatch').style.background=c; document.getElementById('cat-color-hex').textContent=c; selCatColor=c; updateCatPreview && updateCatPreview(); })">
+          <div id="cat-color-swatch" style="width:32px;height:32px;border-radius:50%;background:${selectedColor};border:2px solid var(--border);flex-shrink:0"></div>
+          <div>
+            <div style="font-size:13px;font-weight:500;color:var(--text)">Category color</div>
+            <div id="cat-color-hex" style="font-size:11px;color:var(--text3);font-family:var(--mono)">${selectedColor}</div>
+          </div>
+          <span style="margin-left:auto;color:var(--text3);font-size:12px">▾</span>
         </div>
       </div>
     </div>
@@ -679,9 +690,13 @@ function renderCategoryForm(cat) {
 
 function bindCategoryModalEvents() {
   let selIcon = document.querySelector('.cat-icon-pick[style*="accent-light"]')?.dataset.icon || '📁';
-  let selColor = document.querySelector('.cat-color-pick[style*="var(--text)"]')?.dataset.color || '#3b82f6';
+  let selColor = document.getElementById('cat-color-swatch')?.style.background || '#3b82f6';
+  window.selCatColor = selColor;
+  window.updateCatPreview = null;
 
   const updatePreview = () => {
+    selColor = document.getElementById('cat-color-swatch')?.style.background || selColor;
+    window.updateCatPreview = updatePreview;
     const preview = document.getElementById('cat-preview');
     const previewName = document.getElementById('cat-preview-name');
     const name = document.getElementById('c-name')?.value || 'Category Name';
@@ -719,7 +734,7 @@ function bindCategoryModalEvents() {
     const cid = document.getElementById('save-cat-btn').dataset.cid;
     const name = document.getElementById('c-name').value.trim();
     if (!name) { toast('Name is required', 'error'); return; }
-    const payload = { name, description: document.getElementById('c-desc').value.trim(), icon: selIcon, color: selColor };
+    const payload = { name, description: document.getElementById('c-desc').value.trim(), icon: selIcon, color: document.getElementById('cat-color-swatch')?.style.background || selColor };
     try {
       if (cid) { await API.put('/categories/' + cid, payload); toast('Category updated! ✅'); }
       else { await API.post('/categories', payload); toast('Category created! 🎉'); }
@@ -814,8 +829,14 @@ function renderRoleForm(role) {
       </div>
       <div class="form-group" style="margin-bottom:20px">
         <label>Role Color</label>
-        <div style="display:flex;gap:8px;margin-top:6px">
-          ${colors.map(c => '<div style="width:26px;height:26px;border-radius:50%;background:' + c + ';cursor:pointer;border:3px solid ' + (c===selectedColor?'var(--text)':'transparent') + ';transition:all 0.1s" data-color="' + c + '" class="role-color-pick"></div>').join('')}
+        <div id="role-color-trigger" style="display:flex;align-items:center;gap:12px;margin-top:8px;padding:12px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;cursor:pointer"
+          onclick="showColorPicker('role-color-trigger', document.getElementById('role-color-swatch')?.style.background||'${selectedColor}', (c) => { document.getElementById('role-color-swatch').style.background=c; document.getElementById('role-color-hex').textContent=c; })">
+          <div id="role-color-swatch" style="width:32px;height:32px;border-radius:50%;background:${selectedColor};border:2px solid var(--border);flex-shrink:0"></div>
+          <div>
+            <div style="font-size:13px;font-weight:500;color:var(--text)">Role color</div>
+            <div id="role-color-hex" style="font-size:11px;color:var(--text3);font-family:var(--mono)">${selectedColor}</div>
+          </div>
+          <span style="margin-left:auto;color:var(--text3);font-size:12px">▾</span>
         </div>
       </div>
       <div style="margin-bottom:12px">
@@ -844,15 +865,7 @@ function renderRoleForm(role) {
 }
 
 function bindRoleModalEvents() {
-  let selectedColor = document.querySelector('.role-color-pick[style*="var(--text)"]')?.dataset.color || '#6366f1';
-
-  document.querySelectorAll('.role-color-pick').forEach(el => {
-    el.addEventListener('click', () => {
-      selectedColor = el.dataset.color;
-      document.querySelectorAll('.role-color-pick').forEach(e =>
-        e.style.border = '3px solid ' + (e.dataset.color === selectedColor ? 'var(--text)' : 'transparent'));
-    });
-  });
+  // Color handled by showColorPicker inline onclick
 
   Object.keys(PERM_LABELS).forEach(key => {
     const cb = document.getElementById('perm-' + key);
@@ -875,7 +888,7 @@ function bindRoleModalEvents() {
     const payload = {
       name,
       description: document.getElementById('r-desc').value.trim(),
-      color: selectedColor,
+      color: document.getElementById('role-color-swatch')?.style.background || '#6366f1',
       permissions
     };
     try {
@@ -903,6 +916,14 @@ function renderUsersPage() {
     return colors[Math.abs(hash) % colors.length];
   };
   const roleLabels = {admin:'Admin',qa_engineer:'QA Engineer',developer:'Developer',viewer:'Viewer'};
+  const getRoleLabel = (role) => {
+    if (roleLabels[role]) return roleLabels[role];
+    // Check S.allRoles for the actual name
+    const found = (S.allRoles||[]).find(r => r.slug === role);
+    if (found?.name) return found.name;
+    // Fallback: format slug nicely (team_lead → Team Lead)
+    return role.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  };
   return `<div style="max-width:900px;margin:0 auto;padding:28px 24px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">
       <div>
@@ -911,12 +932,7 @@ function renderUsersPage() {
       </div>
       <button class="btn btn-primary" id="new-user-btn">+ New User</button>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px">
-      ${['admin','qa_engineer','developer','viewer'].map(role => {
-        const count = users.filter(u => u.role === role).length;
-        return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius2);padding:14px;border-top:3px solid ' + getRoleColor(role) + '"><div style="font-size:22px;font-weight:700;color:' + getRoleColor(role) + ';font-family:var(--mono)">' + count + '</div><div style="font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-top:3px">' + roleLabels[role] + '</div></div>';
-      }).join('')}
-    </div>
+
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius2);overflow:hidden">
       <table style="width:100%;border-collapse:collapse">
         <thead><tr style="background:var(--bg2)">
@@ -930,7 +946,7 @@ function renderUsersPage() {
         <tbody>
           ${users.map(u => {
             const isMe = u.id === S.user.id;
-            return '<tr style="border-top:1px solid var(--border)"><td style="padding:12px 16px"><div style="display:flex;align-items:center;gap:10px"><div class="avatar" style="width:34px;height:34px;background:' + (u.avatar_color||'#6366f1') + ';font-size:12px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;color:white">' + u.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase() + '</div><div><div style="font-weight:600;font-size:13px">' + esc(u.name) + '</div>' + (isMe ? '<div style="font-size:10px;color:var(--accent);font-weight:600">You</div>' : '') + '</div></div></td><td style="padding:12px 16px;color:var(--text2);font-size:13px">' + esc(u.email) + '</td><td style="padding:12px 16px"><span style="display:inline-flex;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;background:' + getRoleColor(u.role) + '22;color:' + getRoleColor(u.role) + ';border:1px solid ' + getRoleColor(u.role) + '44">' + (roleLabels[u.role]||u.role) + '</span></td><td style="padding:12px 16px"><span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:' + (u.is_active?'var(--green)':'var(--text3)') + '"><span style="width:7px;height:7px;border-radius:50%;background:' + (u.is_active?'var(--green)':'var(--text4)') + '"></span>' + (u.is_active?'Active':'Inactive') + '</span></td><td style="padding:12px 16px;color:var(--text3);font-size:12px">' + relTime(u.created_at) + '</td><td style="padding:12px 16px;text-align:right"><div style="display:flex;gap:6px;justify-content:flex-end"><button class="btn btn-secondary btn-sm edit-user-btn" data-uid="' + u.id + '">Edit</button>' + (!isMe ? '<button class="btn btn-sm del-user-btn" style="background:var(--red-light);color:var(--red);border:1px solid #f5b4b0" data-uid="' + u.id + '">Delete</button>' : '') + '</div></td></tr>';
+            return '<tr style="border-top:1px solid var(--border)"><td style="padding:12px 16px"><div style="display:flex;align-items:center;gap:10px"><div class="avatar" style="width:34px;height:34px;background:' + (u.avatar_color||'#6366f1') + ';font-size:12px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;color:white">' + u.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase() + '</div><div><div style="font-weight:600;font-size:13px">' + esc(u.name) + '</div>' + (isMe ? '<div style="font-size:10px;color:var(--accent);font-weight:600">You</div>' : '') + '</div></div></td><td style="padding:12px 16px;color:var(--text2);font-size:13px">' + esc(u.email) + '</td><td style="padding:12px 16px"><span style="display:inline-flex;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;background:' + getRoleColor(u.role) + '22;color:' + getRoleColor(u.role) + ';border:1px solid ' + getRoleColor(u.role) + '44">' + (getRoleLabel(u.role)) + '</span></td><td style="padding:12px 16px"><span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:' + (u.is_active?'var(--green)':'var(--text3)') + '"><span style="width:7px;height:7px;border-radius:50%;background:' + (u.is_active?'var(--green)':'var(--text4)') + '"></span>' + (u.is_active?'Active':'Inactive') + '</span></td><td style="padding:12px 16px;color:var(--text3);font-size:12px">' + relTime(u.created_at) + '</td><td style="padding:12px 16px;text-align:right"><div style="display:flex;gap:6px;justify-content:flex-end"><button class="btn btn-secondary btn-sm edit-user-btn" data-uid="' + u.id + '">Edit</button>' + (!isMe ? '<button class="btn btn-sm del-user-btn" style="background:var(--red-light);color:var(--red);border:1px solid #f5b4b0" data-uid="' + u.id + '">Delete</button>' : '') + '</div></td></tr>';
           }).join('')}
         </tbody>
       </table>
@@ -941,7 +957,6 @@ function renderUsersPage() {
 function renderUserForm(user) {
   const isEdit = !!user;
   const u = user || {};
-  const colors = ['#ef4444','#f97316','#f59e0b','#10b981','#3b82f6','#6366f1','#8b5cf6','#ec4899'];
   const selectedColor = u.avatar_color || '#6366f1';
   const initials = u.name ? u.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase() : 'NU';
   return `<div class="modal" id="user-modal">
@@ -955,7 +970,15 @@ function renderUserForm(user) {
         <div>
           <div style="font-size:13px;font-weight:600;margin-bottom:8px">Avatar Color</div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
-            ${colors.map(c => `<div style="width:24px;height:24px;border-radius:50%;background:${c};cursor:pointer;border:3px solid ${c===selectedColor?'var(--text)':'transparent'};transition:all 0.1s" data-color="${c}" class="modal-color-pick"></div>`).join('')}
+            <div id="modal-color-trigger" style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;cursor:pointer;width:100%"
+              onclick="showColorPicker('modal-color-trigger', document.getElementById('modal-color-swatch')?.style.background||'${selectedColor}', (c) => { document.getElementById('modal-color-swatch').style.background=c; document.getElementById('modal-avatar-preview').style.background=c; document.getElementById('modal-color-hex').textContent=c; })">
+              <div id="modal-color-swatch" style="width:28px;height:28px;border-radius:50%;background:${selectedColor};border:2px solid var(--border);flex-shrink:0"></div>
+              <div>
+                <div style="font-size:13px;font-weight:500;color:var(--text)">Avatar color</div>
+                <div id="modal-color-hex" style="font-size:11px;color:var(--text3);font-family:var(--mono)">${selectedColor}</div>
+              </div>
+              <span style="margin-left:auto;color:var(--text3);font-size:12px">▾</span>
+            </div>
           </div>
         </div>
       </div>
@@ -978,13 +1001,7 @@ function renderUserForm(user) {
           <option value="true" ${u.is_active?'selected':''}>Active</option>
           <option value="false" ${!u.is_active?'selected':''}>Inactive</option>
         </select></div>` : ''}
-      <div style="background:var(--bg2);border-radius:var(--radius);padding:12px;font-size:12px;color:var(--text2)">
-        <strong>Roles:</strong>
-        <span style="color:#ef4444">Admin</span> = full access &nbsp;|&nbsp;
-        <span style="color:#3b82f6">QA Engineer</span> = create &amp; publish &nbsp;|&nbsp;
-        <span style="color:#10b981">Developer</span> = edit own &nbsp;|&nbsp;
-        <span style="color:#6366f1">Viewer</span> = read only
-      </div>
+      
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" id="close-modal">Cancel</button>
@@ -995,16 +1012,7 @@ function renderUserForm(user) {
 
 function bindUserModalEvents() {
   let selectedColor = document.getElementById('modal-avatar-preview')?.style.background || '#6366f1';
-  document.querySelectorAll('.modal-color-pick').forEach(el => {
-    el.addEventListener('click', () => {
-      selectedColor = el.dataset.color;
-      document.querySelectorAll('.modal-color-pick').forEach(e => {
-        e.style.border = '3px solid ' + (e.dataset.color === selectedColor ? 'var(--text)' : 'transparent');
-      });
-      const av = document.getElementById('modal-avatar-preview');
-      if (av) av.style.background = selectedColor;
-    });
-  });
+  // color handled by showColorPicker inline
   document.getElementById('save-user-btn')?.addEventListener('click', async () => {
     const uid = document.getElementById('save-user-btn').dataset.uid;
     const name = document.getElementById('u-name').value.trim();
@@ -1045,8 +1053,13 @@ function renderProfile() {
       <div class="form-group"><label>Display Name</label><input type="text" id="p-name" value="${esc(S.user.name)}"></div>
       <div class="form-group">
         <label>Avatar Color</label>
-        <div style="display:flex;gap:8px;margin-top:4px">
-          ${colors.map(c => `<div style="width:26px;height:26px;border-radius:50%;background:${c};cursor:pointer;border:2px solid ${c===S.user.avatar_color?'var(--text)':'transparent'};transition:all 0.1s" data-color="${c}" class="color-pick"></div>`).join('')}
+        <div style="display:flex;align-items:center;gap:12px;margin-top:8px;padding:12px;background:var(--bg2);border-radius:8px;border:1px solid var(--border);cursor:pointer" id="p-color-trigger" onclick="showColorPicker('p-color-trigger', S.user.avatar_color||'#6366f1', (c) => { S.user.avatar_color=c; document.getElementById('p-color-preview').style.background=c; document.getElementById('p-color-trigger').querySelector('.p-hex').textContent=c; })">
+          <div id="p-color-preview" style="width:36px;height:36px;border-radius:50%;background:${S.user.avatar_color||'#6366f1'};border:2px solid var(--border);flex-shrink:0;transition:background 0.15s"></div>
+          <div>
+            <div style="font-size:13px;font-weight:500;color:var(--text)">Pick a color</div>
+            <div class="p-hex" style="font-size:12px;color:var(--text3);font-family:var(--mono);margin-top:2px">${S.user.avatar_color||'#6366f1'}</div>
+          </div>
+          <span style="margin-left:auto;font-size:12px;color:var(--text3)">▾</span>
         </div>
       </div>
       <button class="btn btn-primary btn-sm" id="save-profile-btn">Save Profile</button>
@@ -1184,7 +1197,6 @@ async function loadPermissions() {
 function can(perm) { return S.perms[perm] === true; }
 
 async function loadDashboard() {
-  try { S.needsReview = await API.get('/articles/needs-review'); } catch(e) { S.needsReview = []; }
   const [dash, ann] = await Promise.all([
     API.get('/dashboard'),
     API.get('/dashboard/announcement').catch(() => ({announcement:'', id: null}))
@@ -1239,6 +1251,7 @@ async function navigateTo(page, opts = {}) {
   if (page === 'users') { [S.allUsers, S.allRoles] = await Promise.all([API.get('/users'), API.get('/roles')]); }
   if (page === 'roles') { S.allRoles = await API.get('/roles'); }
   if (page === 'categories') { await loadMeta(); }
+  if (page === 'tags') { S.tags = await API.get('/articles/tags'); }
   render();
   // Fade content back in
   requestAnimationFrame(() => {
@@ -1262,16 +1275,14 @@ function bindEvents() {
   document.querySelectorAll('[data-cat]').forEach(el => {
     el.addEventListener('click', () => navigateTo('category', { catId: parseInt(el.dataset.cat) }));
   });
-  document.getElementById('dark-toggle')?.addEventListener('click', toggleDarkMode);
-  document.getElementById('mobile-dark-toggle')?.addEventListener('click', toggleDarkMode);
-  // Show mobile dark toggle only on mobile
-  const mobileDark = document.getElementById('mobile-dark-toggle');
-  if (mobileDark) mobileDark.style.display = window.innerWidth <= 768 ? 'flex' : 'none';
+  // dark-toggle handled via inline onclick
+
   document.getElementById('logout-btn')?.addEventListener('click', async () => {
     await API.post('/auth/logout');
     S.user = null; S.token = null; localStorage.removeItem('wiki_token');
     render();
   });
+
   document.getElementById('new-article-btn')?.addEventListener('click', () => {
     navigateTo('edit', { article: null });
   });
@@ -1316,6 +1327,10 @@ function bindPageEvents() {
       await navigateTo(S.page === 'read' ? 'all' : S.page);
     });
   });
+  const _mp = document.getElementById('mobile-info-panel');
+  const _as = document.querySelector('.reader-aside');
+  if (_mp && _as) _mp.innerHTML = _as.innerHTML;
+
   const editBtn = document.getElementById('edit-this-btn');
   if (editBtn) editBtn.onclick = async () => {
     const a = await API.get(`/articles/${S.currentArticle.id}`);
@@ -1460,6 +1475,7 @@ function bindPageEvents() {
       } catch(e) { toast(e.message, 'error'); }
     });
   });
+  // Profile color picker handled by showColorPicker inline onclick
   // Profile
   document.querySelectorAll('.color-pick').forEach(el => {
     el.addEventListener('click', async () => {
@@ -1483,33 +1499,7 @@ function bindPageEvents() {
     } catch(e) { toast(e.message, 'error'); }
   });
   // Reactions
-  document.querySelectorAll('.reaction-btn').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      const articleId = S.currentArticle?.id;
-      if (!articleId) return;
-      const react = btn.dataset.react;
-      const userKey = 'react_' + articleId;
-      const prev = localStorage.getItem(userKey);
-      if (prev === react) { toast('Already reacted!'); return; }
-      localStorage.setItem(userKey, react);
-      try {
-        const res = await API.post('/articles/' + articleId + '/react', { reaction: react });
-        document.getElementById('react-yes-count').textContent = res.yes || 0;
-        document.getElementById('react-no-count').textContent = res.no || 0;
-        // Highlight clicked button
-        document.querySelectorAll('.reaction-btn').forEach(b => {
-          b.style.background = 'var(--surface)';
-          b.style.borderColor = 'var(--border)';
-          b.style.color = 'var(--text2)';
-        });
-        btn.style.background = 'var(--accent-light)';
-        btn.style.borderColor = 'var(--accent)';
-        btn.style.color = 'var(--accent)';
-        toast('Thanks for your feedback! 🙏');
-      } catch(e) { toast('Failed to save reaction', 'error'); console.error(e); }
-    });
-  });
+
 
   // TOC + Syntax highlighting - build after render
   setTimeout(() => {
@@ -1529,9 +1519,48 @@ function bindPageEvents() {
     ArticleLock.stop();
   }
 
-  // Review article links
-  document.querySelectorAll('.review-article-link').forEach(el => {
-    el.addEventListener('click', () => navigateTo('read', { articleId: parseInt(el.dataset.article) }));
+  // Tags page
+  document.getElementById('add-tag-page-btn')?.addEventListener('click', async () => {
+    const name = await showPrompt({ title: 'New Tag', message: 'Enter tag name:', placeholder: 'e.g. regression', confirmText: 'Create' });
+    if (!name?.trim()) return;
+    try {
+      const newTag = await API.post('/articles/tags', { name: name.trim() });
+      S.tags = await API.get('/articles/tags');
+      refreshBody();
+      toast('Tag created! 🏷️');
+    } catch(e) { toast('Failed to create tag', 'error'); }
+  });
+
+  document.querySelectorAll('.edit-tag-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = parseInt(btn.dataset.tagId);
+      const current = btn.dataset.tagName;
+      const name = await showPrompt({ title: 'Edit Tag', message: 'Enter new tag name:', defaultValue: current, confirmText: 'Save' });
+      if (!name?.trim() || name.trim() === current) return;
+      try {
+        await API.put('/articles/tags/' + id, { name: name.trim() });
+        S.tags = await API.get('/articles/tags');
+        refreshBody();
+        toast('Tag updated!');
+      } catch(e) { toast(e.message || 'Failed to update tag', 'error'); }
+    });
+  });
+
+  document.querySelectorAll('.del-tag-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = parseInt(btn.dataset.tagId);
+      const name = btn.dataset.tagName;
+      const ok = await showConfirm({ title: 'Delete Tag', message: `Delete tag "${name}"? It will be removed from all articles.`, confirmText: 'Delete', danger: true });
+      if (!ok) return;
+      try {
+        await API.del('/articles/tags/' + id);
+        S.tags = await API.get('/articles/tags');
+        refreshBody();
+        toast('Tag deleted');
+      } catch(e) { toast('Failed to delete tag', 'error'); }
+    });
   });
 
   // Visibility selector
@@ -1621,16 +1650,19 @@ async function saveArticle(status) {
   // Get visibility
   const allChecked = document.getElementById('vis-all')?.checked;
   let visibility = 'all';
+  console.log('[visibility] vis-all checked:', allChecked);
+  console.log('[visibility] all vis inputs:', [...document.querySelectorAll('.vis-label input')].map(i => i.id + '=' + i.checked));
   if (!allChecked) {
     const selected = [...document.querySelectorAll('.vis-label:not([data-slug="all"]) input')]
       .filter(c => c.checked).map(c => c.id.replace('vis-', ''));
     visibility = selected.length > 0 ? selected.join(',') : 'all';
   }
+  console.log('[visibility] final value:', visibility);
   const payload = {
     title,
     content,
     visibility,
-    review_interval_days: parseInt(document.getElementById('e-review-interval')?.value || '0'),
+    review_due_date: document.getElementById('e-review-date')?.value || '',
     excerpt: document.getElementById('e-excerpt')?.value || '',
     content_type: document.getElementById('e-type')?.value || 'article',
     category_id: document.getElementById('e-cat')?.value || null,
@@ -1748,6 +1780,12 @@ const ArticleLock = {
 function addCopyButtons(container) {
   container.querySelectorAll('pre.code-block').forEach(pre => {
     if (pre.querySelector('.code-copy-btn')) return; // already added
+    if (!pre.parentElement.classList.contains('code-block-wrapper')) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'code-block-wrapper';
+      pre.parentNode.insertBefore(wrapper, pre);
+      wrapper.appendChild(pre);
+    }
     const btn = document.createElement('button');
     btn.className = 'code-copy-btn';
     btn.textContent = 'Copy';
@@ -1919,6 +1957,108 @@ function showAnnouncementModal(message, id) {
   });
 }
 
+
+// ─── CUSTOM COLOR PICKER ──────────────────────────────────────────────────────
+function showColorPicker(anchorId, currentColor, onSelect) {
+  const existing = document.getElementById('custom-color-picker');
+  if (existing) { existing.remove(); return; }
+
+  const swatches = [
+    '#ffffff','#e2e8f0','#94a3b8','#64748b','#334155','#1e293b','#0f172a',
+    '#fecaca','#fde68a','#bbf7d0','#a7f3d0','#bfdbfe','#c7d2fe','#f9a8d4',
+    '#f87171','#fbbf24','#34d399','#10b981','#60a5fa','#818cf8','#f472b6',
+    '#ef4444','#f59e0b','#10b981','#06b6d4','#3b82f6','#6366f1','#ec4899',
+    '#dc2626','#d97706','#059669','#0891b2','#2563eb','#4f46e5','#db2777',
+    '#b91c1c','#b45309','#047857','#0e7490','#1d4ed8','#4338ca','#be185d',
+    '#7f1d1d','#78350f','#064e3b','#164e63','#1e3a8a','#312e81','#831843',
+  ];
+
+  const picker = document.createElement('div');
+  picker.id = 'custom-color-picker';
+  picker.style.cssText = `
+    position:fixed;z-index:99999;background:var(--surface);border:1px solid var(--border);
+    border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.2);padding:16px;width:260px;
+    animation:modalIn 0.15s ease
+  `;
+
+  // Position near anchor
+  const anchor = document.getElementById(anchorId);
+  if (anchor) {
+    const rect = anchor.getBoundingClientRect();
+    picker.style.top = (rect.bottom + 8) + 'px';
+    picker.style.left = Math.min(rect.left, window.innerWidth - 276) + 'px';
+  } else {
+    picker.style.top = '50%'; picker.style.left = '50%';
+    picker.style.transform = 'translate(-50%,-50%)';
+  }
+
+  let selected = currentColor || '#6366f1';
+
+  picker.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:12px">
+      ${swatches.map(c => `
+        <div data-color="${c}" style="width:28px;height:28px;border-radius:6px;background:${c};cursor:pointer;border:2px solid ${c===selected?'var(--text)':'transparent'};transition:border-color 0.1s;flex-shrink:0"
+          title="${c}"></div>`).join('')}
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;padding:10px;background:var(--bg2);border-radius:8px;border:1px solid var(--border)">
+      <div id="cp-preview" style="width:32px;height:32px;border-radius:50%;background:${selected};border:2px solid var(--border);flex-shrink:0"></div>
+      <div style="display:flex;align-items:center;gap:6px;flex:1">
+        <span style="font-size:13px;color:var(--text3);font-family:var(--mono)">#</span>
+        <input id="cp-hex-input" type="text" value="${selected.replace('#','')}" maxlength="6"
+          style="flex:1;border:none;background:transparent;font-size:13px;font-family:var(--mono);color:var(--text);outline:none;width:70px">
+      </div>
+      <input type="color" id="cp-native" value="${selected}" style="width:28px;height:28px;border:none;background:none;cursor:pointer;padding:0;border-radius:4px">
+    </div>
+    <button id="cp-apply" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:10px">Apply</button>
+  `;
+
+  document.body.appendChild(picker);
+
+  // Swatch click
+  picker.querySelectorAll('[data-color]').forEach(sw => {
+    sw.addEventListener('click', () => {
+      selected = sw.dataset.color;
+      picker.querySelectorAll('[data-color]').forEach(s => s.style.border = '2px solid ' + (s.dataset.color===selected?'var(--text)':'transparent'));
+      document.getElementById('cp-preview').style.background = selected;
+      document.getElementById('cp-hex-input').value = selected.replace('#','');
+      document.getElementById('cp-native').value = selected;
+    });
+  });
+
+  // Hex input
+  document.getElementById('cp-hex-input').addEventListener('input', (e) => {
+    const val = '#' + e.target.value.replace(/[^0-9a-fA-F]/g,'');
+    if (val.length === 7) {
+      selected = val;
+      document.getElementById('cp-preview').style.background = val;
+      document.getElementById('cp-native').value = val;
+    }
+  });
+
+  // Native color input
+  document.getElementById('cp-native').addEventListener('input', (e) => {
+    selected = e.target.value;
+    document.getElementById('cp-preview').style.background = selected;
+    document.getElementById('cp-hex-input').value = selected.replace('#','');
+  });
+
+  // Apply
+  document.getElementById('cp-apply').addEventListener('click', () => {
+    onSelect(selected);
+    picker.remove();
+  });
+
+  // Click outside to close
+  setTimeout(() => {
+    document.addEventListener('click', function closePicker(e) {
+      if (!picker.contains(e.target) && e.target.id !== anchorId) {
+        picker.remove();
+        document.removeEventListener('click', closePicker);
+      }
+    });
+  }, 200);
+}
+
 // ─── BOOT ─────────────────────────────────────────────────────────────────────
 function initDarkMode() {
   const saved = localStorage.getItem('wiki_dark');
@@ -1938,12 +2078,10 @@ function toggleDarkMode() {
     toggle.style.background = S.darkMode ? 'var(--accent)' : 'var(--border)';
     if (toggle.firstElementChild) toggle.firstElementChild.style.left = S.darkMode ? '16px' : '2px';
   }
-  // Re-wire the dark toggle event after re-render
-  document.getElementById('dark-toggle')?.addEventListener('click', toggleDarkMode);
-  document.getElementById('mobile-dark-toggle')?.addEventListener('click', toggleDarkMode);
-  // Show mobile dark toggle only on mobile
-  const mobileDark = document.getElementById('mobile-dark-toggle');
-  if (mobileDark) mobileDark.style.display = window.innerWidth <= 768 ? 'flex' : 'none';
+  // Update mobile toggle text/icon
+  const mobileTgl = document.getElementById('mobile-dark-toggle');
+  if (mobileTgl) mobileTgl.innerHTML = `<span class="nav-icon">${S.darkMode ? '☀️' : '🌙'}</span><span>${S.darkMode ? 'Light' : 'Dark'}</span>`;
+
 }
 
 async function boot() {

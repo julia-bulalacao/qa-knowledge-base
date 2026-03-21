@@ -116,7 +116,7 @@ class Article(db.Model):
             'tags': [t.to_dict() for t in self.tags],
             'comment_count': self.comments.count(),
             'created_at': self.created_at.isoformat() if self.created_at else None,
-            'reactions': self._get_reactions(),
+
             'visibility': self._safe_get('visibility', 'all'),
             'review_due': self.review_due.isoformat() if self._safe_get('review_due') else None,
             'review_interval_days': self._safe_get('review_interval_days', 180),
