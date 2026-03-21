@@ -109,8 +109,7 @@ def get_article(article_id):
     article = Article.query.options(
         joinedload(Article.author),
         joinedload(Article.category),
-        joinedload(Article.tags),
-        joinedload(Article.comments).joinedload(Comment.author)
+        joinedload(Article.tags)
     ).get_or_404(article_id)
     if article.status != 'published' and user.role == 'viewer':
         return jsonify({'error': 'Not found'}), 404
