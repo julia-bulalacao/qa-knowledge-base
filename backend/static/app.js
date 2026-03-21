@@ -662,12 +662,7 @@ function renderCategoryForm(cat) {
         <label>Description</label>
         <input type="text" id="c-desc" value="${esc(c.description||'')}" placeholder="What kind of articles belong here?">
       </div>
-      <div class="form-group">
-        <label>Icon</label>
-        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">
-          ${CAT_ICONS.map(icon => `<div style="width:34px;height:34px;border-radius:var(--radius);display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;background:${icon===selectedIcon?'var(--accent-light)':'var(--bg2)'};border:2px solid ${icon===selectedIcon?'var(--accent)':'var(--border)'};transition:all 0.1s" class="cat-icon-pick" data-icon="${icon}">${icon}</div>`).join('')}
-        </div>
-      </div>
+
       <div class="form-group">
         <label>Color</label>
         <div id="cat-color-trigger" style="display:flex;align-items:center;gap:12px;margin-top:8px;padding:12px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;cursor:pointer"
@@ -678,6 +673,12 @@ function renderCategoryForm(cat) {
             <div id="cat-color-hex" style="font-size:11px;color:var(--text3);font-family:var(--mono)">${selectedColor}</div>
           </div>
           <span style="margin-left:auto;color:var(--text3);font-size:12px">▾</span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Icon</label>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">
+          ${CAT_ICONS.map(icon => `<div style="width:34px;height:34px;border-radius:var(--radius);display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;background:${icon===selectedIcon?'var(--accent-light)':'var(--bg2)'};border:2px solid ${icon===selectedIcon?'var(--accent)':'var(--border)'};transition:all 0.1s" class="cat-icon-pick" data-icon="${icon}">${icon}</div>`).join('')}
         </div>
       </div>
     </div>
@@ -1963,7 +1964,7 @@ function toHex(color) {
   if (!color) return '#6366f1';
   color = String(color).trim();
   if (color.startsWith('#')) return color.slice(0,7);
-  const m = color.match(/rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/);
+  const m = color.match(/rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/i);
   if (m) return '#' + [m[1],m[2],m[3]].map(n=>parseInt(n).toString(16).padStart(2,'0')).join('');
   return color;
 }
