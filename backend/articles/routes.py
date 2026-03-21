@@ -23,7 +23,13 @@ def _save_history(article, user, change_summary=''):
 @login_required
 def list_articles():
     user = get_current_user()
-    q = Article.query
+    from sqlalchemy.orm import joinedload
+    q = Article.query.options(
+        joinedload(Article.author),
+        joinedload(Article.category),
+        joinedload(Article.tags),
+        joinedload(Article.comments)
+    )
 
     # Check view_drafts permission from DB
     if not has_permission(user, 'view_drafts'):
@@ -100,7 +106,13 @@ def popular_articles():
 @login_required
 def get_article(article_id):
     user = get_current_user()
-    article = Article.query.get_or_404(article_id)
+    from sqlalchemy.orm import joinedload
+    article = Article.query.options(
+        joinedload(Article.author),
+        joinedload(Article.category),
+        joinedload(Article.tags),
+        joinedload(Article.comments).joinedload(Comment.author)
+    ).get_or_404(article_id)
     if article.status != 'published' and user.role == 'viewer':
         return jsonify({'error': 'Not found'}), 404
     article.view_count += 1
