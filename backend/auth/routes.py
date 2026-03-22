@@ -63,7 +63,7 @@ def get_permissions():
 def update_profile():
     user = get_current_user()
     data = request.get_json()
-    for f in ['name', 'avatar_color']:
+    for f in ['name', 'avatar_color', 'email']:
         if f in data:
             setattr(user, f, data[f])
     db.session.commit()

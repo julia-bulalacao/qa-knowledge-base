@@ -117,24 +117,23 @@ function render() {
 // ??? LOGIN ????????????????????????????????????????????????????????????????????
 function renderLogin() {
   return `<div class="login-page">
-    <div class="login-bg"></div>
+    <div class="login-grid-bg"></div>
     <div class="login-card">
-      <div class="login-logo">
-        <span class="login-logo-icon">📚</span>
-        <h1>QA Knowledge Base</h1>
-        <p>Your team's living documentation hub</p>
+      <div class="login-card-header">
+        <div class="login-brand-pill">📚 QA Knowledge Base</div>
+        <button class="login-theme-btn" id="login-dark-toggle" onclick="toggleDarkMode();render()" title="Toggle theme">
+          ${S.darkMode ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg> Light' : '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg> Dark'}
+        </button>
+      </div>
+      <div class="login-hero">
+        <h1 class="login-title">Welcome</h1>
+        <p class="login-sub">Sign in to your team's knowledge hub</p>
       </div>
       ${S.loginError ? `<div class="login-error">${esc(S.loginError)}</div>` : ''}
-      <div class="form-group"><label>Email</label><input type="email" id="l-email" value="admin@qa.dev"></div>
-      <div class="form-group"><label>Password</label><input type="password" id="l-pass" value="Admin@123"></div>
+      <div class="login-field"><label>Email</label><input type="email" id="l-email" placeholder="you@company.com" autocomplete="email"></div>
+      <div class="login-field"><label>Password</label><input type="password" id="l-pass" placeholder="••••••••" autocomplete="current-password"></div>
       <button class="btn btn-primary" style="width:100%;justify-content:center" id="login-btn">Sign In →</button>
-      <div class="login-hint">
-        <strong>Demo accounts:</strong><br>
-        Admin: <code>admin@qa.dev / Admin@123</code><br>
-        QA Engineer: <code>qa@qa.dev / QA@12345</code><br>
-        Developer: <code>dev@qa.dev / Dev@1234</code><br>
-        Viewer: <code>viewer@qa.dev / View@123</code>
-      </div>
+
     </div>
   </div>`;
 }
@@ -284,7 +283,7 @@ function renderHome() {
         <button class="btn btn-secondary btn-sm" id="set-announcement-btn" style="font-size:12px">📢 ${S.announcement ? 'Edit' : 'Post'} Announcement</button>
       </div>` : ''}
       <h1>👋 Welcome, ${esc(S.user.name.split(' ')[0])}!</h1>
-      <p>Your team's living documentation hub —SOPs, onboarding guides, bug fixes, and more.</p>
+      <p>Your team's living documentation hub — SOPs, onboarding guides, bug fixes, and more.</p>
     </div>
     <div class="stats-row" style="grid-template-columns:repeat(3,1fr)">
       <div class="stat-box"><div class="stat-num">${d.total_articles}</div><div class="stat-lbl">Published</div></div>
@@ -375,8 +374,8 @@ function renderArticleList(articles, title, subtitle) {
             <div class="article-row-status">
               ${a.status==='draft'?'<span class="draft-pill">Draft</span>':''}
               ${a.status==='archived'?'<span class="archived-pill">Archived</span>':''}
-              ${(can('edit_any_article')||(can('edit_own_articles')&&a.author?.id===S.user?.id))?`<button class="btn btn-ghost btn-icon btn-sm edit-article-btn" data-article="${a.id}" title="Edit"></button>`:''}
-              ${S.user?.role==='admin'?`<button class="btn btn-ghost btn-icon btn-sm del-article-btn" data-article="${a.id}" title="Delete">✕</button>`:''}
+              ${(can('edit_any_article')||(can('edit_own_articles')&&a.author?.id===S.user?.id))?`<button class="btn btn-ghost btn-icon btn-sm edit-article-btn" data-article="${a.id}" title="Edit" onclick="event.stopPropagation()"></button>`:''}
+              ${S.user?.role==='admin'?`<button class="btn btn-ghost btn-icon btn-sm del-article-btn" data-article="${a.id}" title="Delete" onclick="event.stopPropagation()">✕</button>`:''}
             </div>
           </div>
         </div>
@@ -599,8 +598,8 @@ function renderTagsPage() {
         <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;${i>0?'border-top:1px solid var(--border)':''}">
           <span style="font-size:14px;color:var(--text)">${esc(t.name)}</span>
           <div style="display:flex;gap:6px">
-            <button class="btn btn-secondary btn-sm edit-tag-btn" data-tag-id="${t.id}" data-tag-name="${esc(t.name)}">✏️ Edit</button>
-            <button class="btn btn-sm del-tag-btn" style="background:var(--red-light);color:var(--red);border:1px solid #f5b4b0" data-tag-id="${t.id}" data-tag-name="${esc(t.name)}">✕ Delete</button>
+            <button class="btn btn-secondary btn-sm edit-tag-btn" data-tag-id="${t.id}" data-tag-name="${esc(t.name)}">Edit</button>
+            <button class="btn btn-sm del-tag-btn" style="background:var(--red-light);color:var(--red);border:1px solid #f5b4b0" data-tag-id="${t.id}" data-tag-name="${esc(t.name)}">Delete</button>
           </div>
         </div>`).join('') : '<div style="padding:48px;text-align:center;color:var(--text3)">No tags yet. Create your first tag!</div>'}
     </div>
@@ -627,14 +626,13 @@ function renderCategoriesPage() {
     </div>
     <div style="display:grid;gap:10px">
       ${cats.map(cat => `
-        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius2);padding:16px 20px;display:flex;align-items:center;gap:16px;border-left:4px solid ${cat.color||'#6366f1'}">
+        <div class="cat-list-row" data-cid="${cat.id}" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius2);padding:16px 20px;display:flex;align-items:center;gap:16px;border-left:4px solid ${cat.color||'#6366f1'}">
           <div style="width:42px;height:42px;background:${cat.color||'#6366f1'}22;border-radius:var(--radius);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">${cat.icon||'📁'}</div>
           <div style="flex:1;min-width:0">
-            <div style="font-size:15px;font-weight:600;margin-bottom:2px">${esc(cat.name)}</div>
+            <div class="cat-list-row-name" style="font-size:15px;font-weight:600;margin-bottom:2px;transition:color 0.15s">${esc(cat.name)}</div>
             <div style="font-size:12px;color:var(--text3)">${esc(cat.description||'No description')} &nbsp;·&nbsp; <span style="font-family:var(--mono)">${cat.article_count} article${cat.article_count!==1?'s':''}</span></div>
           </div>
-          <div style="display:flex;gap:8px;flex-shrink:0">
-            <button class="btn btn-ghost btn-sm view-cat-btn" data-cid="${cat.id}">View</button>
+          <div style="display:flex;gap:8px;flex-shrink:0" onclick="event.stopPropagation()">
             ${can('manage_categories') ? `<button class="btn btn-secondary btn-sm edit-cat-btn" data-cid="${cat.id}">Edit</button>` : ''}
             ${can('manage_categories') && cat.article_count===0 ? `<button class="btn btn-sm del-cat-btn" style="background:var(--red-light);color:var(--red);border:1px solid #f5b4b0" data-cid="${cat.id}">Delete</button>` : ''}
           </div>
@@ -671,12 +669,6 @@ function renderCategoryForm(cat) {
         <input type="text" id="c-desc" value="${esc(c.description||'')}" placeholder="What kind of articles belong here?">
       </div>
       <div class="form-group">
-        <label>Icon</label>
-        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">
-          ${CAT_ICONS.map(icon => `<div style="width:34px;height:34px;border-radius:var(--radius);display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;background:${icon===selectedIcon?'var(--accent-light)':'var(--bg2)'};border:2px solid ${icon===selectedIcon?'var(--accent)':'var(--border)'};transition:all 0.1s" class="cat-icon-pick" data-icon="${icon}">${icon}</div>`).join('')}
-        </div>
-      </div>
-      <div class="form-group">
         <label>Color</label>
         <div id="cat-color-trigger" style="display:flex;align-items:center;gap:12px;margin-top:8px;padding:12px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;cursor:pointer"
           onclick="showColorPicker('cat-color-trigger', document.getElementById('cat-color-swatch')?.style.background||'${selectedColor}', (c) => { document.getElementById('cat-color-swatch').style.background=c; document.getElementById('cat-color-hex').textContent=c; selCatColor=c; updateCatPreview && updateCatPreview(); })">
@@ -686,6 +678,12 @@ function renderCategoryForm(cat) {
             <div id="cat-color-hex" style="font-size:11px;color:var(--text3);font-family:var(--mono)">${selectedColor}</div>
           </div>
           <span style="margin-left:auto;color:var(--text3);font-size:12px">▾</span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Icon</label>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">
+          ${CAT_ICONS.map(icon => `<div style="width:34px;height:34px;border-radius:var(--radius);display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;background:${icon===selectedIcon?'var(--accent-light)':'var(--bg2)'};border:2px solid ${icon===selectedIcon?'var(--accent)':'var(--border)'};transition:all 0.1s" class="cat-icon-pick" data-icon="${icon}">${icon}</div>`).join('')}
         </div>
       </div>
     </div>
@@ -1059,6 +1057,7 @@ function renderProfile() {
         </div>
       </div>
       <div class="form-group"><label>Display Name</label><input type="text" id="p-name" value="${esc(S.user.name)}"></div>
+      <div class="form-group"><label>Email</label><input type="email" id="p-email" value="${esc(S.user.email)}"></div>
       <div class="form-group">
         <label>Avatar Color</label>
         <div style="display:flex;align-items:center;gap:12px;margin-top:8px;padding:12px;background:var(--bg2);border-radius:8px;border:1px solid var(--border);cursor:pointer" id="p-color-trigger" onclick="showColorPicker('p-color-trigger', S.user.avatar_color||'#6366f1', (c) => { S.user.avatar_color=c; document.getElementById('p-color-preview').style.background=c; document.getElementById('p-color-trigger').querySelector('.p-hex').textContent=c; })">
@@ -1440,7 +1439,7 @@ function bindPageEvents() {
   document.getElementById('new-cat-btn')?.addEventListener('click', () => {
     openModal(renderCategoryForm()); bindCategoryModalEvents();
   });
-  document.querySelectorAll('.view-cat-btn').forEach(el => {
+  document.querySelectorAll('.cat-list-row').forEach(el => {
     el.addEventListener('click', () => navigateTo('category', { catId: parseInt(el.dataset.cid) }));
   });
   document.querySelectorAll('.edit-cat-btn').forEach(el => {
@@ -1514,14 +1513,27 @@ function bindPageEvents() {
   document.querySelectorAll('.color-pick').forEach(el => {
     el.addEventListener('click', async () => {
       S.user.avatar_color = el.dataset.color;
-      await API.put('/auth/profile', { avatar_color: el.dataset.color });
+      await API.put('/auth/profile-update', { avatar_color: el.dataset.color });
       refreshBody();
     });
   });
   document.getElementById('save-profile-btn')?.addEventListener('click', async () => {
-    const name = document.getElementById('p-name')?.value;
-    await API.put('/auth/profile', { name, avatar_color: toHex(S.user.avatar_color) || '#6366f1' });
-    S.user.name = name; toast('Profile saved!'); render();
+    try {
+      const name = document.getElementById('p-name')?.value?.trim();
+      const newEmail = document.getElementById('p-email')?.value?.trim();
+      const emailChanged = newEmail && newEmail !== S.user.email;
+      const payload = { name, avatar_color: toHex(S.user.avatar_color) || '#6366f1' };
+      if (emailChanged) payload.email = newEmail;
+      await API.put('/auth/profile-update', payload);
+      S.user.name = name;
+      if (emailChanged) {
+        S.user.email = newEmail;
+        toast('Profile saved! Use new email to sign in next time. 📧');
+      } else {
+        toast('Profile saved! ✅');
+      }
+      refreshBody();
+    } catch(e) { toast(e.message || 'Failed to save profile', 'error'); }
   });
   document.getElementById('change-pass-btn')?.addEventListener('click', async () => {
     try {
@@ -2003,7 +2015,6 @@ function toHex(color) {
   if (m) return '#' + [m[1],m[2],m[3]].map(n => parseInt(n).toString(16).padStart(2,'0')).join('');
   return color;
 }
-
 function showColorPicker(anchorId, currentColor, onSelect) {
   currentColor = toHex(currentColor);
   const existing = document.getElementById('custom-color-picker');
@@ -2112,8 +2123,10 @@ function initDarkMode() {
   applyDarkMode();
 }
 function applyDarkMode() {
+  document.documentElement.classList.add('theme-transitioning');
   document.documentElement.setAttribute('data-theme', S.darkMode ? 'dark' : 'light');
   localStorage.setItem('wiki_dark', S.darkMode);
+  setTimeout(() => document.documentElement.classList.remove('theme-transitioning'), 200);
 }
 function toggleDarkMode() {
   S.darkMode = !S.darkMode;
