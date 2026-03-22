@@ -78,7 +78,7 @@ function roleBadge(r) {
   if (['admin','qa_engineer','developer','viewer'].includes(r)) {
     return `<span class="role-badge role-${r}">${label}</span>`;
   }
-  const color = (S.allRoles||[]).find(x=>x.slug===r)?.color || '#6366f1';
+  const color = toHex((S.allRoles||[]).find(x=>x.slug===r)?.color) || '#6366f1';
   return `<span class="role-badge" style="background:${color}22;color:${color};border:1px solid ${color}44">${label}</span>`;
 }
 
@@ -742,7 +742,7 @@ function bindCategoryModalEvents() {
     const cid = document.getElementById('save-cat-btn').dataset.cid;
     const name = document.getElementById('c-name').value.trim();
     if (!name) { toast('Name is required', 'error'); return; }
-    const payload = { name, description: document.getElementById('c-desc').value.trim(), icon: selIcon, color: document.getElementById('cat-color-swatch')?.style.background || selColor };
+    const payload = { name, description: document.getElementById('c-desc').value.trim(), icon: selIcon, color: toHex(document.getElementById('cat-color-swatch')?.style.background) || '#3b82f6' };
     try {
       if (cid) { await API.put('/categories/' + cid, payload); toast('Category updated! ✅'); }
       else { await API.post('/categories', payload); toast('Category created! 🎉'); }
@@ -896,7 +896,7 @@ function bindRoleModalEvents() {
     const payload = {
       name,
       description: document.getElementById('r-desc').value.trim(),
-      color: document.getElementById('role-color-swatch')?.style.background || '#6366f1',
+      color: toHex(document.getElementById('role-color-swatch')?.style.background) || '#6366f1',
       permissions
     };
     try {
@@ -916,7 +916,7 @@ function renderUsersPage() {
     if (roleColors[role]) return roleColors[role];
     // Check S.allRoles for custom role color
     const customRole = (S.allRoles||[]).find(r => r.slug === role || r.name?.toLowerCase() === role?.toLowerCase());
-    if (customRole?.color) return customRole.color;
+    if (customRole?.color) return toHex(customRole.color);
     // Fallback: generate consistent color from role name
     let hash = 0;
     for (let i = 0; i < (role||'').length; i++) hash = role.charCodeAt(i) + ((hash << 5) - hash);
@@ -1030,7 +1030,7 @@ function bindUserModalEvents() {
     if (!name) { toast('Name is required', 'error'); return; }
     if (!uid && !email) { toast('Email is required', 'error'); return; }
     if (!uid && !password) { toast('Password is required', 'error'); return; }
-    const payload = { name, role, avatar_color: selectedColor };
+    const payload = { name, role, avatar_color: toHex(document.getElementById('modal-color-swatch')?.style.background || selectedColor) };
     if (!uid) payload.email = email;
     if (password) payload.password = password;
     if (uid) payload.is_active = document.getElementById('u-active')?.value === 'true';
@@ -1520,7 +1520,7 @@ function bindPageEvents() {
   });
   document.getElementById('save-profile-btn')?.addEventListener('click', async () => {
     const name = document.getElementById('p-name')?.value;
-    await API.put('/auth/profile', { name, avatar_color: S.user.avatar_color });
+    await API.put('/auth/profile', { name, avatar_color: toHex(S.user.avatar_color) || '#6366f1' });
     S.user.name = name; toast('Profile saved!'); render();
   });
   document.getElementById('change-pass-btn')?.addEventListener('click', async () => {
@@ -1995,7 +1995,17 @@ function showAnnouncementModal(message, id) {
 
 
 // ─── CUSTOM COLOR PICKER ──────────────────────────────────────────────────────
+function toHex(color) {
+  if (!color) return '#6366f1';
+  color = String(color).trim();
+  if (color.startsWith('#')) return color.slice(0, 7);
+  const m = color.match(/rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+  if (m) return '#' + [m[1],m[2],m[3]].map(n => parseInt(n).toString(16).padStart(2,'0')).join('');
+  return color;
+}
+
 function showColorPicker(anchorId, currentColor, onSelect) {
+  currentColor = toHex(currentColor);
   const existing = document.getElementById('custom-color-picker');
   if (existing) { existing.remove(); return; }
 
