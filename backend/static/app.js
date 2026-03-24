@@ -105,6 +105,7 @@ function render() {
   app.innerHTML = `
     <div class="app-layout">
       ${renderSidebar()}
+      <div class="drawer-backdrop" id="drawer-backdrop"></div>
       <div class="main-content" id="main">
         ${renderTopbar()}
         <div class="page-body" id="page-body">${renderPage()}</div>
@@ -157,11 +158,14 @@ function renderLogin() {
 // ??? SIDEBAR ?????????????????????????????????????????????????????????????????
 function renderSidebar() {
   const canEdit = can('create_articles') || can('edit_own_articles') || can('edit_any_article');
-  return `<div class="sidebar">
+  return `<div class="sidebar" id="sidebar">
     <div class="sidebar-header">
       <div class="sidebar-brand">
         <div class="brand-icon">📚</div>
         <div class="brand-name">QA Knowledge Base<small>Team Wiki</small></div>
+        <button class="drawer-close-btn" id="drawer-close-btn" aria-label="Close menu">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><line x1="2" y1="2" x2="14" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="14" y1="2" x2="2" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
       </div>
       <div class="sidebar-search">
         <svg class="s-icon" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:13px;height:13px;position:absolute;left:9px;top:50%;transform:translateY(-50%);pointer-events:none;stroke:var(--text3);stroke-width:1.5;stroke-linecap:round">
@@ -208,11 +212,6 @@ function renderSidebar() {
         <span class="nav-icon">🔒</span><span>Roles</span>
       </div>` : ''}
 
-      <!-- Mobile dark mode toggle -->
-      <div class="nav-item" id="mobile-dark-toggle" onclick="toggleDarkMode()">
-        <span class="nav-icon">${S.darkMode ? '☀️' : '🌙'}</span><span>${S.darkMode ? 'Light' : 'Dark'}</span>
-      </div>
-
       <!-- Categories list -->
       ${(S.categories||[]).length ? `
       <div class="nav-divider"></div>
@@ -253,6 +252,13 @@ function renderTopbar() {
     crumbs.push(`<span class="crumb active">${pages[S.page]||''}</span>`);
   }
   return `<div class="topbar">
+    <button class="hamburger-btn" id="hamburger-btn" aria-label="Open menu">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+        <rect y="3" width="18" height="1.8" rx="0.9" fill="currentColor"/>
+        <rect y="8.1" width="18" height="1.8" rx="0.9" fill="currentColor"/>
+        <rect y="13.2" width="18" height="1.8" rx="0.9" fill="currentColor"/>
+      </svg>
+    </button>
     <div class="topbar-breadcrumb">
       <span class="crumb" style="cursor:pointer" data-page="home">Home</span>
       ${crumbs.length ? `<span class="sep">&gt;</span>${crumbs.join('<span class="sep">&gt;</span>')}` : ''}
@@ -1382,16 +1388,42 @@ function refreshBody() {
   const pb = document.getElementById('page-body');
   if (pb) { pb.innerHTML = renderPage(); bindPageEvents(); }
   const tb = document.querySelector('.topbar');
-  if (tb) tb.outerHTML = renderTopbar();
+  if (tb) { tb.outerHTML = renderTopbar(); bindTopbarEvents(); }
 }
 
 // ─── EVENTS ───────────────────────────────────────────────────────────────────
-function bindEvents() {
-  document.querySelectorAll('[data-page]').forEach(el => {
+function bindTopbarEvents() {
+  document.getElementById('hamburger-btn')?.addEventListener('click', () => toggleDrawer());
+  document.getElementById('new-article-btn')?.addEventListener('click', () => navigateTo('edit', { article: null }));
+  document.querySelectorAll('.topbar [data-page]').forEach(el => {
     el.addEventListener('click', () => navigateTo(el.dataset.page));
   });
+}
+
+function toggleDrawer(forceClose) {
+  const sidebar = document.getElementById('sidebar');
+  const backdrop = document.getElementById('drawer-backdrop');
+  if (!sidebar || !backdrop) return;
+  const isOpen = sidebar.classList.contains('drawer-open');
+  if (forceClose || isOpen) {
+    sidebar.classList.remove('drawer-open');
+    backdrop.classList.remove('open');
+  } else {
+    sidebar.classList.add('drawer-open');
+    backdrop.classList.add('open');
+  }
+}
+
+function bindEvents() {
+  document.getElementById('drawer-backdrop')?.addEventListener('click', () => toggleDrawer(true));
+  document.getElementById('drawer-close-btn')?.addEventListener('click', () => toggleDrawer(true));
+
+  // [data-page] on sidebar nav items — exclude .page-btn (pagination) which use data-page for page numbers
+  document.querySelectorAll('.sidebar [data-page]').forEach(el => {
+    el.addEventListener('click', () => { toggleDrawer(true); navigateTo(el.dataset.page); });
+  });
   document.querySelectorAll('[data-cat]').forEach(el => {
-    el.addEventListener('click', () => navigateTo('category', { catId: parseInt(el.dataset.cat) }));
+    el.addEventListener('click', () => { toggleDrawer(true); navigateTo('category', { catId: parseInt(el.dataset.cat) }); });
   });
   // dark-toggle handled via inline onclick
 
@@ -1401,9 +1433,7 @@ function bindEvents() {
     render();
   });
 
-  document.getElementById('new-article-btn')?.addEventListener('click', () => {
-    navigateTo('edit', { article: null });
-  });
+  bindTopbarEvents();
   const gs = document.getElementById('global-search');
   if (gs) {
     gs.addEventListener('keypress', async e => {

@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find c:/Users/anonu/Downloads/qa-wiki/qa-wiki/frontend/src -type f \\\\\\(-name *nav* -o -name *sidebar* -o -name *header* -o -name *menu* -o -name *profile* \\\\\\) -iname *.tsx -o -iname *.ts -o -iname *.jsx -o -iname *.js)"
+    ]
+  }
+}
