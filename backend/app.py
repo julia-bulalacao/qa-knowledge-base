@@ -23,7 +23,8 @@ def create_app():
 
     db.init_app(app)
     bcrypt.init_app(app)
-    CORS(app, supports_credentials=True, origins=['*'])
+    allowed_origins = os.environ.get('ALLOWED_ORIGINS', 'http://localhost:5001').split(',')
+    CORS(app, supports_credentials=True, origins=[o.strip() for o in allowed_origins])
 
     from auth.routes import auth_bp
     from articles.routes import articles_bp
@@ -61,8 +62,21 @@ def create_app():
     with app.app_context():
         db.create_all()
         seed()
+        _backfill_role_slugs()
 
     return app
+
+def _backfill_role_slugs():
+    """One-time fix: sync role_slug from role for users where role_slug is NULL.
+    Exits immediately if no such users exist to avoid unnecessary work on every startup."""
+    from models import User
+    users = User.query.filter(User.role_slug.is_(None)).all()
+    if not users:
+        return
+    for u in users:
+        if u.role:
+            u.role_slug = u.role
+    db.session.commit()
 
 def seed():
     from models import User, Category, Tag, Article

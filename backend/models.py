@@ -38,6 +38,8 @@ class Category(db.Model):
 
     children = db.relationship('Category', backref=db.backref('parent', remote_side=[id]), lazy='dynamic')
     articles = db.relationship('Article', backref='category', lazy='dynamic')
+    role_access = db.relationship('RoleCategoryAccess', lazy='dynamic',
+                                  foreign_keys='RoleCategoryAccess.category_id')
 
     def to_dict(self, include_children=False):
         d = {
@@ -45,7 +47,8 @@ class Category(db.Model):
             'description': self.description, 'icon': self.icon,
             'color': self.color, 'parent_id': self.parent_id,
             'order': self.order,
-            'article_count': self.articles.filter_by(status='published').count()
+            'article_count': self.articles.filter_by(status='published').count(),
+            'restricted_role_ids': [rca.role_id for rca in self.role_access.all()],
         }
         if include_children:
             d['children'] = [c.to_dict() for c in self.children.order_by(Category.order).all()]
@@ -75,6 +78,7 @@ class Article(db.Model):
     history = db.relationship('ArticleHistory', backref='article', lazy='dynamic', cascade='all, delete-orphan')
     author = db.relationship('User', foreign_keys=[author_id], backref='articles_authored')
     last_editor = db.relationship('User', foreign_keys=[last_edited_by_id])
+    role_access = db.relationship('ArticleRoleAccess', lazy='dynamic', cascade='all, delete-orphan')
 
     def _safe_get(self, attr, default=None):
         try:
@@ -117,7 +121,8 @@ class Article(db.Model):
             'comment_count': self.comments.count(),
             'created_at': self.created_at.isoformat() if self.created_at else None,
 
-            'visibility': self._safe_get('visibility', 'all'),
+            # visibility_roles: authoritative M2M list (empty list = visible to all)
+            'visibility_roles': [ra.role_slug for ra in self.role_access.all()],
             'review_due': self.review_due.isoformat() if self._safe_get('review_due') else None,
             'review_interval_days': self._safe_get('review_interval_days', 180),
             'needs_review': self._needs_review(),
@@ -159,6 +164,8 @@ class Role(db.Model):
     perm_view_drafts = db.Column(db.Boolean, default=False)
 
     users = db.relationship('User', backref='role_obj', lazy='dynamic', foreign_keys='User.role_slug')
+    category_access = db.relationship('RoleCategoryAccess', lazy='dynamic',
+                                      foreign_keys='RoleCategoryAccess.role_id')
 
     def to_dict(self):
         return {
@@ -167,6 +174,7 @@ class Role(db.Model):
             'is_system': self.is_system,
             'created_at': self.created_at.isoformat(),
             'user_count': self.users.count(),
+            'allowed_category_ids': [ca.category_id for ca in self.category_access.all()],
             'permissions': {
                 'create_articles': self.perm_create_articles,
                 'edit_any_article': self.perm_edit_any_article,
@@ -180,6 +188,40 @@ class Role(db.Model):
                 'view_drafts': self.perm_view_drafts,
             }
         }
+
+
+class RoleCategoryAccess(db.Model):
+    """Junction table: which categories a role can access.
+    Empty = no restriction (show all). Non-empty = show only listed categories."""
+    __tablename__ = 'role_category_access'
+    id          = db.Column(db.Integer, primary_key=True)
+    role_id     = db.Column(db.Integer, db.ForeignKey('role.id', ondelete='CASCADE'), nullable=False)
+    category_id = db.Column(db.Integer, db.ForeignKey('category.id', ondelete='CASCADE'), nullable=False)
+    __table_args__ = (db.UniqueConstraint('role_id', 'category_id', name='uq_role_category'),)
+
+
+class ArticleRoleAccess(db.Model):
+    """Per-article role visibility control.
+    No rows for an article  → visible to all roles (public within the team).
+    One or more rows        → visible only to the listed role slugs.
+    Replaces the legacy comma-separated `visibility` VARCHAR column."""
+    __tablename__ = 'article_role_access'
+    id         = db.Column(db.Integer, primary_key=True)
+    article_id = db.Column(db.Integer, db.ForeignKey('article.id', ondelete='CASCADE'), nullable=False)
+    role_slug  = db.Column(db.String(64), nullable=False)
+    __table_args__ = (db.UniqueConstraint('article_id', 'role_slug', name='uq_article_role'),)
+
+
+class ArticleLock(db.Model):
+    """DB-backed article edit lock — survives server restarts and works across workers.
+    Replaces the in-memory _article_locks dict.
+    TTL is enforced by the application (expires_at column)."""
+    __tablename__ = 'article_lock'
+    article_id = db.Column(db.Integer, db.ForeignKey('article.id', ondelete='CASCADE'), primary_key=True)
+    user_id    = db.Column(db.Integer, db.ForeignKey('user.id',    ondelete='CASCADE'), nullable=False)
+    locked_at  = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    user       = db.relationship('User')
 
 class Comment(db.Model):
     id = db.Column(db.Integer, primary_key=True)

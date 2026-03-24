@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify, session
 from extensions import db, bcrypt
 from models import User
 from utils import get_current_user, login_required
-import jwt, datetime
+import jwt, datetime, os
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -10,7 +10,7 @@ def make_token(user_id):
     return jwt.encode({
         'user_id': user_id,
         'exp': datetime.datetime.utcnow() + datetime.timedelta(days=7)
-    }, 'qa-wiki-secret-2024', algorithm='HS256')
+    }, os.environ.get('SECRET_KEY', 'qa-wiki-secret-2024'), algorithm='HS256')
 
 @auth_bp.route('/login', methods=['POST'])
 def login():
@@ -41,7 +41,10 @@ def change_password():
     data = request.get_json()
     if not bcrypt.check_password_hash(user.password, data.get('current_password', '')):
         return jsonify({'error': 'Current password incorrect'}), 400
-    user.password = bcrypt.generate_password_hash(data['new_password']).decode('utf-8')
+    new_password = data.get('new_password', '')
+    if not new_password or len(new_password) < 8:
+        return jsonify({'error': 'New password must be at least 8 characters'}), 400
+    user.password = bcrypt.generate_password_hash(new_password).decode('utf-8')
     db.session.commit()
     return jsonify({'message': 'Password updated'})
 
@@ -63,6 +66,9 @@ def get_permissions():
 def update_profile():
     user = get_current_user()
     data = request.get_json()
+    if 'email' in data and data['email'] != user.email:
+        if User.query.filter(User.email == data['email'], User.id != user.id).first():
+            return jsonify({'error': 'Email already in use by another account'}), 400
     for f in ['name', 'avatar_color', 'email']:
         if f in data:
             setattr(user, f, data[f])

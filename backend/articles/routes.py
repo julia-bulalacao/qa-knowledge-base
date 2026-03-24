@@ -1,11 +1,70 @@
 from flask import Blueprint, request, jsonify, send_file
 from extensions import db
-from models import Article, Tag, ArticleHistory, User
-from utils import get_current_user, login_required, role_required, perm_required, slugify, unique_slug, can_edit, can_publish, has_permission
-from datetime import datetime
-from sqlalchemy import or_
+from models import Article, Tag, ArticleHistory, User, ArticleRoleAccess, ArticleLock
+from utils import get_current_user, login_required, role_required, perm_required, slugify, unique_slug, can_edit, can_publish, has_permission, get_role_category_ids, expand_category_ids
+from datetime import datetime, timedelta
+from sqlalchemy import or_, exists as sa_exists
 
 articles_bp = Blueprint('articles', __name__)
+
+
+LOCK_TTL_SECONDS = 120  # Article edit lock lifetime
+
+
+def _apply_visibility_filter(q, user):
+    """Apply article-level visibility + category-level access filters for the given user.
+    Uses EXISTS subqueries against article_role_access for exact, indexed matching.
+    Admins bypass all filters."""
+    if user.role == 'admin':
+        return q
+
+    user_role = user.role_slug or user.role
+
+    # Articles with NO rows in article_role_access are visible to everyone.
+    # Articles WITH rows are visible only to roles listed there.
+    has_restrictions = sa_exists().where(ArticleRoleAccess.article_id == Article.id)
+    user_is_allowed  = sa_exists().where(
+        (ArticleRoleAccess.article_id == Article.id) &
+        (ArticleRoleAccess.role_slug  == user_role)
+    )
+    q = q.filter(~has_restrictions | user_is_allowed)
+
+    # Category-level access (role_category_access table)
+    allowed_cat_ids = get_role_category_ids(user)
+    if allowed_cat_ids is not None:
+        effective_cat_ids = expand_category_ids(allowed_cat_ids)
+        q = q.filter(
+            or_(Article.category_id.is_(None), Article.category_id.in_(effective_cat_ids))
+        )
+
+    return q
+
+
+def _user_can_access_article(article, user):
+    """Return True if the user may access this specific article.
+    Queries article_role_access directly — exact match, no string parsing."""
+    if user.role == 'admin':
+        return True
+    user_role = user.role_slug or user.role
+
+    # Count restrictions; if none exist the article is open to all.
+    restriction_count = ArticleRoleAccess.query.filter_by(article_id=article.id).count()
+    if restriction_count > 0:
+        allowed = ArticleRoleAccess.query.filter_by(
+            article_id=article.id, role_slug=user_role
+        ).first()
+        if not allowed:
+            return False
+
+    # Category-level access check
+    allowed_cat_ids = get_role_category_ids(user)
+    if allowed_cat_ids is not None:
+        effective_cat_ids = expand_category_ids(allowed_cat_ids)
+        if article.category_id is not None and article.category_id not in effective_cat_ids:
+            return False
+
+    return True
+
 
 def _save_history(article, user, change_summary=''):
     from models import ArticleHistory
@@ -34,22 +93,8 @@ def list_articles():
     if not has_permission(user, 'view_drafts'):
         q = q.filter_by(status='published')
 
-    # Filter by visibility - admin sees all, others see only their role's articles
-    if user.role != 'admin':
-        try:
-            user_role = user.role_slug or user.role
-            # Get visible article IDs using raw SQL to bypass SQLAlchemy cache
-            from sqlalchemy import text as sqlt
-            result = db.session.execute(sqlt(
-                "SELECT id FROM article WHERE visibility IS NULL OR visibility = '' "
-                "OR visibility = 'all' OR visibility LIKE :role_pattern"
-            ), {'role_pattern': f'%{user_role}%'})
-            visible_ids = [row[0] for row in result]
-            q = q.filter(Article.id.in_(visible_ids))
-            print(f"[DEBUG] Visible article IDs for {user_role}: {visible_ids}")
-        except Exception as e:
-            print(f"[DEBUG] Visibility filter error: {e}")
-            pass
+    # Apply role-based visibility + category access filtering
+    q = _apply_visibility_filter(q, user)
 
     kw = request.args.get('q')
     if kw:
@@ -73,7 +118,6 @@ def list_articles():
 
     pinned_first = q.filter_by(is_pinned=True).order_by(Article.updated_at.desc()).all()
     rest = q.filter_by(is_pinned=False).order_by(Article.updated_at.desc()).all()
-    print(f"[DEBUG] Articles returned: {[(a.id, a.title[:20], getattr(a,'visibility','N/A')) for a in pinned_first+rest]}")
 
     page = int(request.args.get('page', 1))
     per_page = int(request.args.get('per_page', 20))
@@ -92,13 +136,17 @@ def list_articles():
 @articles_bp.route('/recent', methods=['GET'])
 @login_required
 def recent_articles():
-    articles = Article.query.filter_by(status='published').order_by(Article.updated_at.desc()).limit(5).all()
+    user = get_current_user()
+    q = _apply_visibility_filter(Article.query.filter_by(status='published'), user)
+    articles = q.order_by(Article.updated_at.desc()).limit(5).all()
     return jsonify([a.to_dict() for a in articles])
 
 @articles_bp.route('/popular', methods=['GET'])
 @login_required
 def popular_articles():
-    articles = Article.query.filter_by(status='published').order_by(Article.view_count.desc()).limit(5).all()
+    user = get_current_user()
+    q = _apply_visibility_filter(Article.query.filter_by(status='published'), user)
+    articles = q.order_by(Article.view_count.desc()).limit(5).all()
     return jsonify([a.to_dict() for a in articles])
 
 @articles_bp.route('/<int:article_id>', methods=['GET'])
@@ -111,10 +159,13 @@ def get_article(article_id):
         joinedload(Article.category),
         joinedload(Article.tags)
     ).get_or_404(article_id)
-    if article.status != 'published' and user.role == 'viewer':
+    if article.status != 'published' and not has_permission(user, 'view_drafts'):
         return jsonify({'error': 'Not found'}), 404
-    article.view_count += 1
-    db.session.commit()
+    if not _user_can_access_article(article, user):
+        return jsonify({'error': 'Not found'}), 404
+    if article.status == 'published':
+        article.view_count += 1
+        db.session.commit()
     d = article.to_dict(include_content=True)
     d['comments'] = [c.to_dict() for c in article.comments.order_by(db.text('created_at')).all()]
     d['history'] = [h.to_dict() for h in article.history.order_by(ArticleHistory.version.desc()).limit(10).all()]
@@ -125,10 +176,13 @@ def get_article(article_id):
 def get_article_by_slug(slug):
     user = get_current_user()
     article = Article.query.filter_by(slug=slug).first_or_404()
-    if article.status != 'published' and user.role == 'viewer':
+    if article.status != 'published' and not has_permission(user, 'view_drafts'):
         return jsonify({'error': 'Not found'}), 404
-    article.view_count += 1
-    db.session.commit()
+    if not _user_can_access_article(article, user):
+        return jsonify({'error': 'Not found'}), 404
+    if article.status == 'published':
+        article.view_count += 1
+        db.session.commit()
     d = article.to_dict(include_content=True)
     d['comments'] = [c.to_dict() for c in article.comments.order_by(db.text('created_at')).all()]
     d['history'] = [h.to_dict() for h in article.history.order_by(ArticleHistory.version.desc()).limit(10).all()]
@@ -139,9 +193,12 @@ def get_article_by_slug(slug):
 def create_article():
     user = get_current_user()
     data = request.get_json()
-    slug = unique_slug(slugify(data['title']), Article)
+    title = (data.get('title') or '').strip()
+    if not title:
+        return jsonify({'error': 'Title is required'}), 400
+    slug = unique_slug(slugify(title), Article)
     article = Article(
-        title=data['title'], slug=slug,
+        title=title, slug=slug,
         content=data.get('content', ''),
         excerpt=data.get('excerpt', '')[:500] if data.get('excerpt') else '',
         content_type=data.get('content_type', 'article'),
@@ -158,7 +215,12 @@ def create_article():
         if tag:
             article.tags.append(tag)
     db.session.add(article)
-    db.session.flush()
+    db.session.flush()  # gives article.id before commit
+
+    # Visibility: write to article_role_access table (empty = visible to all)
+    for role_slug in (data.get('visibility_roles') or []):
+        db.session.add(ArticleRoleAccess(article_id=article.id, role_slug=role_slug))
+
     # Save initial history
     _save_history(article, user, 'Initial version')
     db.session.commit()
@@ -175,24 +237,28 @@ def update_article(article_id):
         return jsonify({'error': 'You can only edit your own articles'}), 403
 
     data = request.get_json()
+
+    # Check publish permission BEFORE mutating any fields (BUG-024)
+    if 'status' in data and data['status'] == 'published' and not has_permission(user, 'publish_articles'):
+        return jsonify({'error': 'You do not have permission to publish articles'}), 403
+
     change_summary = data.get('change_summary', 'Updated')
 
-    for f in ['title', 'content', 'excerpt', 'content_type', 'category_id', 'is_pinned']:
+    if 'title' in data:
+        new_title = (data['title'] or '').strip()
+        if not new_title:
+            return jsonify({'error': 'Title cannot be empty'}), 400
+        article.title = new_title
+
+    for f in ['content', 'excerpt', 'content_type', 'category_id', 'is_pinned']:
         if f in data:
             setattr(article, f, data[f])
 
-    # Visibility - explicit set with SQL to bypass SQLAlchemy cache
-    if 'visibility' in data:
-        print(f"[DEBUG] Saving visibility: {data['visibility']} for article {article.id}")
-        try:
-            from sqlalchemy import text
-            db.session.execute(
-                text('UPDATE article SET visibility = :v WHERE id = :id'),
-                {'v': data['visibility'], 'id': article.id}
-            )
-            print(f"[DEBUG] Visibility SQL executed successfully")
-        except Exception as e:
-            print(f"[DEBUG] Visibility save error: {e}")
+    # Visibility: replace access rows atomically
+    if 'visibility_roles' in data:
+        ArticleRoleAccess.query.filter_by(article_id=article.id).delete()
+        for role_slug in (data['visibility_roles'] or []):
+            db.session.add(ArticleRoleAccess(article_id=article.id, role_slug=role_slug))
 
     # Review reminder - direct date
     if 'review_due_date' in data:
@@ -207,8 +273,6 @@ def update_article(article_id):
             pass
 
     if 'status' in data:
-        if data['status'] == 'published' and not has_permission(user, 'publish_articles'):
-            return jsonify({'error': 'You do not have permission to publish articles'}), 403
         article.status = data['status']
         if data['status'] == 'published' and not article.published_at:
             article.published_at = datetime.utcnow()
@@ -246,7 +310,6 @@ def export_pdf(article_id):
         return jsonify({'error': 'Not found'}), 404
     buffer = generate_article_pdf(article)
     safe_title = ''.join(c if c.isalnum() or c in ' -_' else '_' for c in article.title)[:60]
-    filename = f"{article.defect_id if hasattr(article, 'defect_id') else safe_title}.pdf"
     filename = f"{safe_title}.pdf"
     return send_file(
         buffer,
@@ -257,49 +320,55 @@ def export_pdf(article_id):
 
 
 
-# Simple in-memory lock store (resets on server restart - sufficient for small teams)
-_article_locks = {}
-
 @articles_bp.route('/<int:article_id>/lock', methods=['POST'])
 @login_required
 def acquire_lock(article_id):
-    from datetime import datetime
+    """Acquire an edit lock for an article. DB-backed — safe across multiple workers."""
     user = get_current_user()
-    existing = _article_locks.get(article_id)
-    if existing and existing['user_id'] != user.id:
-        # Check if lock is stale (> 2 minutes)
-        age = (datetime.utcnow() - existing['acquired_at']).total_seconds()
-        if age < 120:
-            return jsonify({'locked': True, 'locked_by': existing['user_name']})
-    _article_locks[article_id] = {
-        'user_id': user.id, 'user_name': user.name,
-        'acquired_at': datetime.utcnow()
-    }
+    now  = datetime.utcnow()
+    existing = ArticleLock.query.filter_by(article_id=article_id).first()
+
+    if existing:
+        if existing.user_id != user.id and existing.expires_at > now:
+            # Held by someone else and still valid
+            holder = existing.user
+            return jsonify({'locked': True, 'locked_by': holder.name if holder else 'Another user'})
+        # Expired or it is our own lock — remove and re-acquire
+        db.session.delete(existing)
+        db.session.flush()
+
+    lock = ArticleLock(
+        article_id=article_id,
+        user_id=user.id,
+        locked_at=now,
+        expires_at=now + timedelta(seconds=LOCK_TTL_SECONDS),
+    )
+    db.session.add(lock)
+    db.session.commit()
     return jsonify({'locked': False})
+
 
 @articles_bp.route('/<int:article_id>/lock', methods=['DELETE'])
 @login_required
 def release_lock(article_id):
     user = get_current_user()
-    lock = _article_locks.get(article_id)
-    if lock and lock['user_id'] == user.id:
-        del _article_locks[article_id]
+    ArticleLock.query.filter_by(article_id=article_id, user_id=user.id).delete()
+    db.session.commit()
     return jsonify({'message': 'Released'})
+
 
 @articles_bp.route('/<int:article_id>/lock-status', methods=['GET'])
 @login_required
 def lock_status(article_id):
-    from datetime import datetime
-    lock = _article_locks.get(article_id)
+    now  = datetime.utcnow()
+    lock = ArticleLock.query.filter_by(article_id=article_id).first()
     if not lock:
         return jsonify({'locked': False, 'locked_by': None})
-    age = (datetime.utcnow() - lock['acquired_at']).total_seconds()
-    if age > 120:
-        del _article_locks[article_id]
+    if lock.expires_at <= now:
+        db.session.delete(lock)
+        db.session.commit()
         return jsonify({'locked': False, 'locked_by': None})
-    from models import User
-    locked_user = User.query.get(lock['user_id'])
-    return jsonify({'locked': True, 'locked_by': locked_user.to_dict() if locked_user else None})
+    return jsonify({'locked': True, 'locked_by': lock.user.to_dict() if lock.user else None})
 
 
 

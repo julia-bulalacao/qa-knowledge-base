@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Maskable safe zone: keep content within inner 80% (x:51, y:51, w:410, h:410) -->
+  <rect width="512" height="512" rx="80" fill="#b5451b"/>
+  <!-- Book body -->
+  <rect x="116" y="96" width="240" height="308" rx="14" fill="#f5f0eb"/>
+  <!-- Spine -->
+  <rect x="116" y="96" width="42" height="308" rx="10" fill="#8a3314"/>
+  <!-- Lines (pages) -->
+  <rect x="192" y="162" width="132" height="13" rx="6.5" fill="#c8bdb5"/>
+  <rect x="192" y="196" width="132" height="13" rx="6.5" fill="#c8bdb5"/>
+  <rect x="192" y="230" width="132" height="13" rx="6.5" fill="#c8bdb5"/>
+  <rect x="192" y="264" width="100" height="13" rx="6.5" fill="#c8bdb5"/>
+  <rect x="192" y="298" width="116" height="13" rx="6.5" fill="#c8bdb5"/>
+  <!-- Second book (stacked) -->
+  <rect x="148" y="394" width="240" height="30" rx="10" fill="#d4622a"/>
+  <rect x="138" y="378" width="256" height="24" rx="10" fill="#c45520"/>
+</svg>

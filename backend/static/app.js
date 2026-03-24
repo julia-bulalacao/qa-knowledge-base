@@ -45,7 +45,7 @@ function toast(msg, type = 'success') {
 }
 
 // ??? UTILS ????????????????????????????????????????????????????????????????????
-function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 function relTime(iso) {
   if (!iso) return '—';
   // Append Z if no timezone info so browser treats it as UTC, not local time
@@ -227,7 +227,7 @@ function renderSidebar() {
 
 
 function renderTopbar() {
-  const canCreate = ['admin','qa_engineer','developer'].includes(S.user?.role);
+  const canCreate = can('create_articles');
   const pages = { home:'Home', all:'All Articles', drafts:'My Drafts', profile:'Profile', read:'Reading', edit:'Editor' };
   const crumbs = [];
   if (S.page === 'category' && S.currentCategoryId) {
@@ -275,7 +275,7 @@ function renderHome() {
       ${S.announcement && (can('manage_users') || localStorage.getItem('wiki_ack_announcement') === String(S.announcementId)) ? `
       <div style="background:var(--yellow-light);border:1px solid var(--yellow);border-radius:var(--radius);padding:10px 16px;margin-bottom:16px;display:flex;align-items:flex-start;gap:10px;font-size:13px">
         <span style="font-size:16px;flex-shrink:0">📢</span>
-        <span style="color:var(--yellow);font-weight:600;flex:1;line-height:1.6;white-space:pre-wrap">${S.announcement}</span>
+        <span style="color:var(--yellow);font-weight:600;flex:1;line-height:1.6;white-space:pre-wrap">${esc(S.announcement)}</span>
         ${can('manage_users') ? `<button class="btn btn-ghost btn-sm" id="clear-announcement" style="color:var(--yellow);padding:2px 8px;flex-shrink:0">✕</button>` : ''}
       </div>` : ''}
       ${can('manage_users') ? `
@@ -386,9 +386,9 @@ function renderArticleList(articles, title, subtitle) {
         <div class="empty-sub">Try a different search or create a new article</div>
       </div>`}
     ${S.articlePages > 1 ? `<div class="pagination">
-      <button class="page-btn" id="prev-page" ${S.articlePage<=1?'disabled':''}>✕</button>
+      <button class="page-btn" id="prev-page" ${S.articlePage<=1?'disabled':''}>←</button>
       ${Array.from({length:S.articlePages},(_,i)=>`<button class="page-btn${S.articlePage===i+1?' active':''}" data-page="${i+1}">${i+1}</button>`).join('')}
-      <button class="page-btn" id="next-page" ${S.articlePage>=S.articlePages?'disabled':''}>✕</button>
+      <button class="page-btn" id="next-page" ${S.articlePage>=S.articlePages?'disabled':''}>→</button>
     </div>` : ''}
   </div>`;
 }
@@ -561,9 +561,10 @@ function renderEditor() {
     <div class="form-group">
       <label>Visibility</label>
       <div style="display:flex;flex-wrap:wrap;gap:8px" id="vis-picker">
-        ${[{slug:'all',name:'Everyone'},{slug:'admin',name:'Admin'},{slug:'qa_engineer',name:'QA Engineer'},{slug:'developer',name:'Developer'},{slug:'viewer',name:'Viewer'}].map(r => {
-          const vis = a?.visibility || 'all';
-          const checked = vis === 'all' ? r.slug === 'all' : (r.slug !== 'all' && vis.split(',').includes(r.slug));
+        ${[{slug:'all',name:'Everyone'}, ...(S.allRoles||[]).map(r => ({slug:r.slug, name:r.name}))].map(r => {
+          const visRoles = a?.visibility_roles || [];
+          // 'all' option is checked when no roles are restricted; role options checked when in the list
+          const checked = r.slug === 'all' ? visRoles.length === 0 : visRoles.includes(r.slug);
           return '<label class="vis-label" data-slug="' + r.slug + '" style="display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;border:1px solid var(--border);cursor:pointer;font-size:12px;font-weight:500;background:' + (checked?'var(--accent-light)':'var(--surface)') + ';color:' + (checked?'var(--accent)':'var(--text2)') + '">' +
             '<input type="checkbox" id="vis-' + r.slug + '" ' + (checked?'checked':'') + ' style="display:none">' + esc(r.name) + '</label>';
         }).join('')}
@@ -629,7 +630,13 @@ function renderCategoriesPage() {
         <div class="cat-list-row" data-cid="${cat.id}" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius2);padding:16px 20px;display:flex;align-items:center;gap:16px;border-left:4px solid ${cat.color||'#6366f1'}">
           <div style="width:42px;height:42px;background:${cat.color||'#6366f1'}22;border-radius:var(--radius);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">${cat.icon||'📁'}</div>
           <div style="flex:1;min-width:0">
-            <div class="cat-list-row-name" style="font-size:15px;font-weight:600;margin-bottom:2px;transition:color 0.15s">${esc(cat.name)}</div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">
+              <div class="cat-list-row-name" style="font-size:15px;font-weight:600;transition:color 0.15s">${esc(cat.name)}</div>
+              ${(cat.restricted_role_ids||[]).length ? (() => {
+                const names = (cat.restricted_role_ids||[]).map(id => (S.allRoles||[]).find(r=>r.id===id)?.name || id).join(', ');
+                return '<span title="Restricted to: ' + esc(names) + '" style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;background:var(--accent-light);color:var(--accent);border:1px solid var(--accent);flex-shrink:0">🔒 ' + esc(names) + '</span>';
+              })() : ''}
+            </div>
             <div style="font-size:12px;color:var(--text3)">${esc(cat.description||'No description')} &nbsp;·&nbsp; <span style="font-family:var(--mono)">${cat.article_count} article${cat.article_count!==1?'s':''}</span></div>
           </div>
           <div style="display:flex;gap:8px;flex-shrink:0" onclick="event.stopPropagation()">
@@ -686,6 +693,19 @@ function renderCategoryForm(cat) {
           ${CAT_ICONS.map(icon => `<div style="width:34px;height:34px;border-radius:var(--radius);display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;background:${icon===selectedIcon?'var(--accent-light)':'var(--bg2)'};border:2px solid ${icon===selectedIcon?'var(--accent)':'var(--border)'};transition:all 0.1s" class="cat-icon-pick" data-icon="${icon}">${icon}</div>`).join('')}
         </div>
       </div>
+      <div class="form-group" style="margin-top:16px">
+        <label>Role Access</label>
+        <div style="font-size:12px;color:var(--text3);margin-top:2px;margin-bottom:10px">Restrict visibility to specific roles. Leave all unchecked to show to everyone.</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px" id="cat-role-picker">
+          ${(S.allRoles||[]).filter(r => r.slug !== 'admin').map(r => {
+            const restricted = (c.restricted_role_ids||[]).includes(r.id);
+            return '<label class="cat-role-label" data-rid="' + r.id + '" style="display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;border:1px solid ' + (restricted?'var(--accent)':'var(--border)') + ';cursor:pointer;font-size:12px;font-weight:500;background:' + (restricted?'var(--accent-light)':'var(--surface)') + ';color:' + (restricted?'var(--accent)':'var(--text2)') + ';transition:all 0.12s">' +
+              '<input type="checkbox" id="cat-role-' + r.id + '" ' + (restricted?'checked':'') + ' style="display:none">' +
+              esc(r.name) + '</label>';
+          }).join('')}
+          ${!(S.allRoles||[]).filter(r=>r.slug!=='admin').length ? '<span style="font-size:12px;color:var(--text3)">No roles found. Create roles first.</span>' : ''}
+        </div>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" id="close-modal">Cancel</button>
@@ -736,11 +756,31 @@ function bindCategoryModalEvents() {
     });
   });
 
+  // Role access pill toggle
+  document.querySelectorAll('.cat-role-label').forEach(label => {
+    label.addEventListener('click', () => {
+      const cb = label.querySelector('input');
+      if (!cb) return;
+      cb.checked = !cb.checked;
+      label.style.background   = cb.checked ? 'var(--accent-light)' : 'var(--surface)';
+      label.style.color        = cb.checked ? 'var(--accent)'       : 'var(--text2)';
+      label.style.borderColor  = cb.checked ? 'var(--accent)'       : 'var(--border)';
+    });
+  });
+
   document.getElementById('save-cat-btn')?.addEventListener('click', async () => {
     const cid = document.getElementById('save-cat-btn').dataset.cid;
     const name = document.getElementById('c-name').value.trim();
     if (!name) { toast('Name is required', 'error'); return; }
-    const payload = { name, description: document.getElementById('c-desc').value.trim(), icon: selIcon, color: toHex(document.getElementById('cat-color-swatch')?.style.background) || '#3b82f6' };
+    const role_ids = [...document.querySelectorAll('#cat-role-picker .cat-role-label input:checked')]
+      .map(cb => parseInt(cb.id.replace('cat-role-', '')));
+    const payload = {
+      name,
+      description: document.getElementById('c-desc').value.trim(),
+      icon: selIcon,
+      color: toHex(document.getElementById('cat-color-swatch')?.style.background) || '#3b82f6',
+      role_ids,
+    };
     try {
       if (cid) { await API.put('/categories/' + cid, payload); toast('Category updated! ✅'); }
       else { await API.post('/categories', payload); toast('Category created! 🎉'); }
@@ -787,6 +827,12 @@ function renderRolesPage() {
                 <span style="font-size:12px;color:var(--text3)">${role.user_count} user${role.user_count !== 1 ? 's' : ''}</span>
               </div>
               <div style="font-size:12px;color:var(--text3)">${esc(role.description||'No description')}</div>
+              ${(role.allowed_category_ids||[]).length ? (() => {
+                const allCats = [];
+                (S.categories||[]).forEach(c => { allCats.push(c); (c.children||[]).forEach(ch => allCats.push(ch)); });
+                const names = (role.allowed_category_ids||[]).map(id => allCats.find(c=>c.id===id)?.name || ('Cat #'+id)).join(', ');
+                return '<div style="margin-top:4px;display:flex;align-items:center;gap:5px;font-size:11px;color:var(--accent)"><span>🔒</span><span>Category access: <strong>' + esc(names) + '</strong></span></div>';
+              })() : '<div style="margin-top:4px;font-size:11px;color:var(--text4)">Category access: all categories</div>'}
             </div>
             <div style="display:flex;gap:8px;flex-shrink:0">
               <button class="btn btn-secondary btn-sm edit-role-btn" data-rid="${role.id}">Edit Permissions</button>
@@ -895,7 +941,7 @@ function bindRoleModalEvents() {
       name,
       description: document.getElementById('r-desc').value.trim(),
       color: toHex(document.getElementById('role-color-swatch')?.style.background) || '#6366f1',
-      permissions
+      permissions,
     };
     try {
       if (rid) { await API.put('/roles/' + rid, payload); toast('Role updated!'); }
@@ -1087,7 +1133,7 @@ function openModal(html) {
   document.getElementById('overlay')?.addEventListener('click', e => { if (e.target.id === 'overlay') closeModal(); });
 }
 
-function closeModal() { console.log('closeModal called from:', new Error().stack.split('\n').slice(1,3).join(' | ')); document.getElementById('modal-root').innerHTML = ''; }
+function closeModal() { document.getElementById('modal-root').innerHTML = ''; }
 
 // ─── CUSTOM MODAL DIALOGS ─────────────────────────────────────────────────────
 function showConfirm({ title, message, confirmText = 'Confirm', cancelText = 'Cancel', danger = false }) {
@@ -1278,11 +1324,16 @@ async function navigateTo(page, opts = {}) {
   if (page === 'read' && opts.articleId) { S.currentArticle = await API.get(`/articles/${opts.articleId}`); }
   if (page === 'edit') {
     S.editingArticle = opts.article || null;
+    // Ensure roles are loaded so the visibility picker is populated dynamically
+    if (!S.allRoles || !S.allRoles.length) S.allRoles = await API.get('/roles');
     if (opts.article?.id) ArticleLock.acquire(opts.article.id);
   }
   if (page === 'users') { [S.allUsers, S.allRoles] = await Promise.all([API.get('/users'), API.get('/roles')]); }
-  if (page === 'roles') { S.allRoles = await API.get('/roles'); }
-  if (page === 'categories') { await loadMeta(); }
+  if (page === 'roles') {
+    // Load both roles and categories so the role form's category picker is populated
+    [S.allRoles] = await Promise.all([API.get('/roles'), loadMeta()]);
+  }
+  if (page === 'categories') { [S.allRoles] = await Promise.all([API.get('/roles'), loadMeta()]); }
   if (page === 'tags') { S.tags = await API.get('/articles/tags'); }
   render();
   hidePageLoader();
@@ -1558,9 +1609,15 @@ function bindPageEvents() {
     }
   }, 100);
 
-  // Article lock
+  // Article lock — only poll if the current user has edit rights on this article
   if (S.page === 'read' && S.currentArticle) {
-    ArticleLock.start(S.currentArticle.id);
+    const canEditThisArticle = can('edit_any_article') ||
+      (can('edit_own_articles') && S.currentArticle.author?.id === S.user?.id);
+    if (canEditThisArticle) {
+      ArticleLock.start(S.currentArticle.id);
+    } else {
+      ArticleLock.stop();
+    }
   } else {
     ArticleLock.stop();
   }
@@ -1655,8 +1712,8 @@ function bindEditorEvents() {
     el.addEventListener('click', () => el.classList.toggle('selected'));
   });
 
-  // Add new tag inline
-  document.getElementById('add-tag-btn')?.addEventListener('click', async (e) => {
+  // Add new tag inline — named function so it can be rebound after picker re-render (fixes arguments.callee)
+  async function handleInlineTagCreate(e) {
     e.stopPropagation();
     const name = await showPrompt({ title: 'New Tag', message: 'Enter tag name:', placeholder: 'e.g. robot-framework', confirmText: 'Create' });
     if (!name?.trim()) return;
@@ -1672,12 +1729,12 @@ function bindEditorEvents() {
           '<span class="tag ' + (selected.includes(t.id) ? 'selected' : '') + '" data-tag-id="' + t.id + '">' + esc(t.name) + '</span>'
         ).join('') + '<span id="add-tag-btn" style="display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:4px;border:1px dashed var(--border);font-size:12px;color:var(--text3);cursor:pointer">+ New Tag</span>';
         picker.querySelectorAll('.tag').forEach(el => el.addEventListener('click', () => el.classList.toggle('selected')));
-        // Rebind add-tag-btn
-        picker.querySelector('#add-tag-btn')?.addEventListener('click', arguments.callee);
+        picker.querySelector('#add-tag-btn')?.addEventListener('click', handleInlineTagCreate);
       }
       toast('Tag created! 🏷️');
     } catch(e) { toast('Failed to create tag', 'error'); }
-  });
+  }
+  document.getElementById('add-tag-btn')?.addEventListener('click', handleInlineTagCreate);
 
   document.getElementById('save-draft-btn')?.addEventListener('click', () => saveArticle('draft'));
   document.getElementById('publish-article-btn')?.addEventListener('click', () => saveArticle('published'));
@@ -1693,21 +1750,15 @@ async function saveArticle(status) {
   if (!title) { toast('Title is required', 'error'); return; }
   const tagIds = [...document.querySelectorAll('#tag-picker .tag.selected')].map(el => parseInt(el.dataset.tagId));
   const content = (typeof Editor !== 'undefined' && Editor.getValue) ? Editor.getValue() : (S._editorContent || '');
-  // Get visibility
+  // Collect visibility_roles: empty array means visible to all roles
   const allChecked = document.getElementById('vis-all')?.checked;
-  let visibility = 'all';
-  console.log('[visibility] vis-all checked:', allChecked);
-  console.log('[visibility] all vis inputs:', [...document.querySelectorAll('.vis-label input')].map(i => i.id + '=' + i.checked));
-  if (!allChecked) {
-    const selected = [...document.querySelectorAll('.vis-label:not([data-slug="all"]) input')]
+  const visibility_roles = allChecked ? [] :
+    [...document.querySelectorAll('.vis-label:not([data-slug="all"]) input')]
       .filter(c => c.checked).map(c => c.id.replace('vis-', ''));
-    visibility = selected.length > 0 ? selected.join(',') : 'all';
-  }
-  console.log('[visibility] final value:', visibility);
   const payload = {
     title,
     content,
-    visibility,
+    visibility_roles,
     review_due_date: document.getElementById('e-review-date')?.value || '',
     excerpt: document.getElementById('e-excerpt')?.value || '',
     content_type: document.getElementById('e-type')?.value || 'article',
@@ -2011,7 +2062,8 @@ function toHex(color) {
   if (!color) return '#6366f1';
   color = String(color).trim();
   if (color.startsWith('#')) return color.slice(0, 7);
-  const m = color.match(/rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+  // Handles both rgb() and rgba() — alpha channel is ignored
+  const m = color.match(/rgba?\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
   if (m) return '#' + [m[1],m[2],m[3]].map(n => parseInt(n).toString(16).padStart(2,'0')).join('');
   return color;
 }

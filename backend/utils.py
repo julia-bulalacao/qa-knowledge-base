@@ -13,7 +13,7 @@ def get_current_user():
             try:
                 data = jwt.decode(token, os.environ.get('SECRET_KEY', 'qa-wiki-secret-2024'), algorithms=['HS256'])
                 user_id = data.get('user_id')
-            except:
+            except jwt.PyJWTError:
                 return None
     if user_id:
         return User.query.get(user_id)
@@ -75,6 +75,39 @@ def perm_required(perm):
             return f(*args, **kwargs)
         return decorated
     return decorator
+
+def get_role_category_ids(user):
+    """Return the set of allowed category IDs for the user's role.
+
+    Returns None  → no restrictions (show everything).
+    Returns set() → role has restrictions; only those IDs (and their
+                    descendants, via expand_category_ids) may be shown.
+    Admins always get None (unrestricted).
+    """
+    if not user or user.role == 'admin':
+        return None
+    role = get_role(user)
+    if not role:
+        return None
+    ids = [ca.category_id for ca in role.category_access.all()]
+    if not ids:
+        return None  # No restrictions defined — show everything
+    return set(ids)
+
+
+def expand_category_ids(category_ids):
+    """Expand a set of category IDs to include all their descendants."""
+    from models import Category
+    effective = set(category_ids)
+    queue = list(category_ids)
+    while queue:
+        cat_id = queue.pop()
+        for child in Category.query.filter_by(parent_id=cat_id).all():
+            if child.id not in effective:
+                effective.add(child.id)
+                queue.append(child.id)
+    return effective
+
 
 def can_edit(user):
     return has_permission(user, 'create_articles') or has_permission(user, 'edit_own_articles')
