@@ -91,6 +91,7 @@ def _save_role_access(category_id, role_ids):
 @perm_required('manage_categories')
 def delete_category(cat_id):
     cat = Category.query.get_or_404(cat_id)
+    RoleCategoryAccess.query.filter_by(category_id=cat_id).delete(synchronize_session=False)
     db.session.delete(cat)
     db.session.commit()
     return jsonify({'message': 'Deleted'})

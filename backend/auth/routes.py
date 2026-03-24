@@ -12,6 +12,27 @@ def make_token(user_id):
         'exp': datetime.datetime.utcnow() + datetime.timedelta(days=7)
     }, os.environ.get('SECRET_KEY', 'qa-wiki-secret-2024'), algorithm='HS256')
 
+@auth_bp.route('/register', methods=['POST'])
+def register():
+    data = request.get_json()
+    name = (data.get('name') or '').strip()
+    email = (data.get('email') or '').strip().lower()
+    password = data.get('password', '')
+    if len(name) < 2:
+        return jsonify({'error': 'Name must be at least 2 characters'}), 400
+    if not email or '@' not in email:
+        return jsonify({'error': 'A valid email is required'}), 400
+    if len(password) < 8:
+        return jsonify({'error': 'Password must be at least 8 characters'}), 400
+    if User.query.filter_by(email=email).first():
+        return jsonify({'error': 'An account with this email already exists'}), 400
+    hashed = bcrypt.generate_password_hash(password).decode('utf-8')
+    user = User(name=name, email=email, password=hashed, role='viewer', role_slug='viewer', is_active=True)
+    db.session.add(user)
+    db.session.commit()
+    token = make_token(user.id)
+    return jsonify({'user': user.to_dict(), 'token': token}), 201
+
 @auth_bp.route('/login', methods=['POST'])
 def login():
     data = request.get_json()

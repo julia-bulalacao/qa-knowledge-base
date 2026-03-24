@@ -163,6 +163,44 @@ def parse_markdown_to_pdf(md, style_body, style_h1, style_h2, style_h3, style_co
             text = clean_inline(line[6:])
             mark = '☑' if checked else '☐'
             story.append(Paragraph(f'{mark} &nbsp;{text}', style_bullet))
+        # Markdown table
+        elif line.strip().startswith('|'):
+            table_lines = []
+            while i < len(lines) and lines[i].strip().startswith('|'):
+                table_lines.append(lines[i])
+                i += 1
+            raw_rows = [[c.strip() for c in tl.strip().strip('|').split('|')] for tl in table_lines]
+            sep_idx = next((idx for idx, cells in enumerate(raw_rows)
+                            if all(re.match(r'^[-:\s]+$', c) for c in cells if c.strip())), None)
+            data = []
+            for idx, cells in enumerate(raw_rows):
+                if all(re.match(r'^[-:\s]+$', c) for c in cells if c.strip()):
+                    continue
+                is_header = sep_idx is not None and idx < sep_idx
+                cell_style = ParagraphStyle('TC', fontSize=9,
+                    fontName='Helvetica-Bold' if is_header else 'Helvetica',
+                    textColor=TEXT2 if is_header else TEXT, leading=14)
+                data.append(([Paragraph(clean_inline(c), cell_style) for c in cells], is_header))
+            if data:
+                num_cols = max(len(r[0]) for r in data)
+                col_w = 15.5 * cm / num_cols
+                t = Table([r[0] for r in data], colWidths=[col_w] * num_cols)
+                ts = [
+                    ('GRID', (0, 0), (-1, -1), 0.5, BORDER),
+                    ('TOPPADDING', (0, 0), (-1, -1), 6),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                    ('LEFTPADDING', (0, 0), (-1, -1), 8),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+                    ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                ]
+                for idx, (_, is_header) in enumerate(data):
+                    if is_header:
+                        ts.append(('BACKGROUND', (0, idx), (-1, idx), BG2))
+                t.setStyle(TableStyle(ts))
+                story.append(Spacer(1, 6))
+                story.append(t)
+                story.append(Spacer(1, 8))
+            continue
         # Empty line
         elif line.strip() == '':
             story.append(Spacer(1, 4))

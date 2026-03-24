@@ -12,6 +12,7 @@ const S = {
   editingArticle: null,
   editorMode: 'write',
   loginError: null,
+  registerMode: false, registerError: null,
 };
 
 // ??? API ??????????????????????????????????????????????????????????????????????
@@ -114,17 +115,24 @@ function render() {
   bindEvents();
 }
 
-// ??? LOGIN ????????????????????????????????????????????????????????????????????
+// ??? LOGIN / REGISTER ????????????????????????????????????????????????????????
 function renderLogin() {
-  return `<div class="login-page">
-    <div class="login-grid-bg"></div>
-    <div class="login-card">
-      <div class="login-card-header">
-        <div class="login-brand-pill">📚 QA Knowledge Base</div>
-        <button class="login-theme-btn" id="login-dark-toggle" onclick="toggleDarkMode();render()" title="Toggle theme">
+  const themeBtn = `<button class="login-theme-btn" id="login-dark-toggle" onclick="toggleDarkMode();render()" title="Toggle theme">
           ${S.darkMode ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg> Light' : '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg> Dark'}
-        </button>
+        </button>`;
+  const body = S.registerMode ? `
+      <div class="login-hero">
+        <h1 class="login-title">Create account</h1>
+        <p class="login-sub">Join your team's knowledge hub</p>
       </div>
+      ${S.registerError ? `<div class="login-error">${esc(S.registerError)}</div>` : ''}
+      <div class="login-field"><label>Full Name</label><input type="text" id="r-name" placeholder="Your name" autocomplete="name"></div>
+      <div class="login-field"><label>Email</label><input type="email" id="r-email" placeholder="you@company.com" autocomplete="email"></div>
+      <div class="login-field"><label>Password</label><input type="password" id="r-pass" placeholder="Min. 8 characters" autocomplete="new-password"></div>
+      <div class="login-field"><label>Confirm Password</label><input type="password" id="r-pass2" placeholder="••••••••" autocomplete="new-password"></div>
+      <p class="login-hint">You'll start as a <strong>Viewer</strong> — an admin can upgrade your role.</p>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:4px" id="register-btn">Create Account →</button>
+      <p class="login-link">Already have an account? <a href="#" id="go-login">Sign in</a></p>` : `
       <div class="login-hero">
         <h1 class="login-title">Welcome</h1>
         <p class="login-sub">Sign in to your team's knowledge hub</p>
@@ -133,7 +141,15 @@ function renderLogin() {
       <div class="login-field"><label>Email</label><input type="email" id="l-email" placeholder="you@company.com" autocomplete="email"></div>
       <div class="login-field"><label>Password</label><input type="password" id="l-pass" placeholder="••••••••" autocomplete="current-password"></div>
       <button class="btn btn-primary" style="width:100%;justify-content:center" id="login-btn">Sign In →</button>
-
+      <p class="login-link">No account? <a href="#" id="go-register">Create one</a></p>`;
+  return `<div class="login-page">
+    <div class="login-grid-bg"></div>
+    <div class="login-card">
+      <div class="login-card-header">
+        <div class="login-brand-pill">📚 QA Knowledge Base</div>
+        ${themeBtn}
+      </div>
+      ${body}
     </div>
   </div>`;
 }
@@ -285,11 +301,9 @@ function renderHome() {
       <h1>👋 Welcome, ${esc(S.user.name.split(' ')[0])}!</h1>
       <p>Your team's living documentation hub — SOPs, onboarding guides, bug fixes, and more.</p>
     </div>
-    <div class="stats-row" style="grid-template-columns:repeat(3,1fr)">
+    <div class="stats-row" style="grid-template-columns:repeat(2,1fr)">
       <div class="stat-box"><div class="stat-num">${d.total_articles}</div><div class="stat-lbl">Published</div></div>
-      <div class="stat-box"><div class="stat-num">${d.draft_articles}</div><div class="stat-lbl">Drafts</div></div>
       <div class="stat-box"><div class="stat-num">${d.total_categories}</div><div class="stat-lbl">Categories</div></div>
-
     </div>
     <div class="section-title">Browse by Category</div>
     <div class="category-grid">
@@ -299,7 +313,7 @@ function renderHome() {
         <div class="cat-card-desc">Browse all published articles</div>
         <div class="cat-card-count">${S.dashboardData?.total_articles||0} article${(S.dashboardData?.total_articles||0)!==1?'s':''}</div>
       </div>
-      ${(S.categories||[]).map(c=>`
+      ${(S.categories||[]).slice(0,5).map(c=>`
         <div class="cat-card" data-cat="${c.id}">
           <div class="cat-card-icon">${c.icon}</div>
           <div class="cat-card-name">${esc(c.name)}</div>
@@ -627,21 +641,13 @@ function renderCategoriesPage() {
     </div>
     <div style="display:grid;gap:10px">
       ${cats.map(cat => `
-        <div class="cat-list-row" data-cid="${cat.id}" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius2);padding:16px 20px;display:flex;align-items:center;gap:16px;border-left:4px solid ${cat.color||'#6366f1'}">
+        <div class="cat-list-row" data-cid="${cat.id}" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius2);padding:16px 20px;display:flex;align-items:center;gap:16px;border-left:4px solid ${cat.color||'#6366f1'};${canEdit?'cursor:pointer;':''}" >
           <div style="width:42px;height:42px;background:${cat.color||'#6366f1'}22;border-radius:var(--radius);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">${cat.icon||'📁'}</div>
           <div style="flex:1;min-width:0">
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">
               <div class="cat-list-row-name" style="font-size:15px;font-weight:600;transition:color 0.15s">${esc(cat.name)}</div>
-              ${(cat.restricted_role_ids||[]).length ? (() => {
-                const names = (cat.restricted_role_ids||[]).map(id => (S.allRoles||[]).find(r=>r.id===id)?.name || id).join(', ');
-                return '<span title="Restricted to: ' + esc(names) + '" style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;background:var(--accent-light);color:var(--accent);border:1px solid var(--accent);flex-shrink:0">🔒 ' + esc(names) + '</span>';
-              })() : ''}
             </div>
-            <div style="font-size:12px;color:var(--text3)">${esc(cat.description||'No description')} &nbsp;·&nbsp; <span style="font-family:var(--mono)">${cat.article_count} article${cat.article_count!==1?'s':''}</span></div>
-          </div>
-          <div style="display:flex;gap:8px;flex-shrink:0" onclick="event.stopPropagation()">
-            ${can('manage_categories') ? `<button class="btn btn-secondary btn-sm edit-cat-btn" data-cid="${cat.id}">Edit</button>` : ''}
-            ${can('manage_categories') && cat.article_count===0 ? `<button class="btn btn-sm del-cat-btn" style="background:var(--red-light);color:var(--red);border:1px solid #f5b4b0" data-cid="${cat.id}">Delete</button>` : ''}
+            <div style="font-size:12px;color:var(--text3)">${esc(cat.description||'No description')}</div>
           </div>
         </div>`).join('')}
       ${cats.length===0 ? '<div class="empty-state"><div class="empty-icon">📂</div><div class="empty-title">No categories yet</div><div class="empty-sub">Create your first category to organize articles</div></div>' : ''}
@@ -707,9 +713,16 @@ function renderCategoryForm(cat) {
         </div>
       </div>
     </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" id="close-modal">Cancel</button>
-      <button class="btn btn-primary" id="save-cat-btn" data-cid="${c.id||''}">${isEdit?'Save Changes':'Create Category'}</button>
+    <div class="modal-footer" style="justify-content:space-between">
+      <div>
+        ${isEdit ? `<button class="btn btn-sm" id="delete-cat-btn" data-cid="${c.id}"
+          ${(c.article_count||0) > 0 ? 'disabled title="Cannot delete a category that has articles"' : ''}
+          style="background:var(--red-light);color:var(--red);border:1px solid #f5b4b0;${(c.article_count||0)>0?'opacity:0.45;cursor:not-allowed':''}">Delete Category</button>` : ''}
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-secondary" id="close-modal">Cancel</button>
+        <button class="btn btn-primary" id="save-cat-btn" data-cid="${c.id||''}">${isEdit?'Save Changes':'Create Category'}</button>
+      </div>
     </div>
   </div>`;
 }
@@ -768,6 +781,19 @@ function bindCategoryModalEvents() {
     });
   });
 
+  document.getElementById('delete-cat-btn')?.addEventListener('click', async () => {
+    const cid = document.getElementById('delete-cat-btn').dataset.cid;
+    const ok = await showConfirm({ title: 'Delete Category', message: 'Are you sure you want to delete this category? This cannot be undone.', confirmText: 'Yes, Delete', danger: true });
+    if (!ok) return;
+    try {
+      await API.del('/categories/' + cid);
+      toast('Category deleted');
+      closeModal();
+      await loadMeta();
+      refreshBody();
+    } catch(e) { toast(e.message, 'error'); }
+  });
+
   document.getElementById('save-cat-btn')?.addEventListener('click', async () => {
     const cid = document.getElementById('save-cat-btn').dataset.cid;
     const name = document.getElementById('c-name').value.trim();
@@ -802,7 +828,7 @@ const PERM_LABELS = {
   manage_users:      { label: 'Manage Users',      desc: 'Can create/edit/delete users' },
   export_pdf:        { label: 'Export PDF',        desc: 'Can export articles as PDF' },
   add_comments:      { label: 'Add Comments',      desc: 'Can post comments on articles' },
-  view_drafts:       { label: 'View Drafts',       desc: 'Can see unpublished drafts' },
+  view_drafts:       { label: 'View Own Drafts',   desc: 'Can see and edit their own unpublished drafts' },
 };
 
 function renderRolesPage() {
@@ -817,26 +843,16 @@ function renderRolesPage() {
     </div>
     <div style="display:grid;gap:14px">
       ${(S.allRoles||[]).map(role => `
-        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius2);overflow:hidden;border-left:4px solid ${role.color}">
+        <div class="role-card" data-rid="${role.id}" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius2);overflow:hidden;border-left:4px solid ${role.color};cursor:pointer">
           <div style="padding:16px 20px;display:flex;align-items:center;gap:14px;border-bottom:1px solid var(--border)">
             <div style="flex:1">
               <div style="display:flex;align-items:center;gap:10px;margin-bottom:3px;flex-wrap:wrap">
-                <span style="font-size:15px;font-weight:700">${esc(role.name)}</span>
+                <span class="role-card-name" style="font-size:15px;font-weight:700;transition:color 0.15s">${esc(role.name)}</span>
                 ${role.is_system ? '<span style="font-size:10px;background:var(--bg3);color:var(--text3);border:1px solid var(--border);padding:1px 7px;border-radius:10px;font-weight:600">SYSTEM</span>' : ''}
                 <span style="font-size:11px;font-family:var(--mono);color:var(--text4)">@${role.slug}</span>
                 <span style="font-size:12px;color:var(--text3)">${role.user_count} user${role.user_count !== 1 ? 's' : ''}</span>
               </div>
               <div style="font-size:12px;color:var(--text3)">${esc(role.description||'No description')}</div>
-              ${(role.allowed_category_ids||[]).length ? (() => {
-                const allCats = [];
-                (S.categories||[]).forEach(c => { allCats.push(c); (c.children||[]).forEach(ch => allCats.push(ch)); });
-                const names = (role.allowed_category_ids||[]).map(id => allCats.find(c=>c.id===id)?.name || ('Cat #'+id)).join(', ');
-                return '<div style="margin-top:4px;display:flex;align-items:center;gap:5px;font-size:11px;color:var(--accent)"><span>🔒</span><span>Category access: <strong>' + esc(names) + '</strong></span></div>';
-              })() : '<div style="margin-top:4px;font-size:11px;color:var(--text4)">Category access: all categories</div>'}
-            </div>
-            <div style="display:flex;gap:8px;flex-shrink:0">
-              <button class="btn btn-secondary btn-sm edit-role-btn" data-rid="${role.id}">Edit Permissions</button>
-              ${!role.is_system ? '<button class="btn btn-sm del-role-btn" style="background:var(--red-light);color:var(--red);border:1px solid #f5b4b0" data-rid="' + role.id + '">Delete</button>' : ''}
             </div>
           </div>
           <div style="padding:14px 20px">
@@ -909,9 +925,14 @@ function renderRoleForm(role) {
         }).join('')}
       </div>
     </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" id="close-modal">Cancel</button>
-      <button class="btn btn-primary" id="save-role-btn" data-rid="${r.id||''}">${isEdit ? 'Save Changes' : 'Create Role'}</button>
+    <div class="modal-footer" style="justify-content:space-between">
+      <div>
+        ${isEdit && !r.is_system ? `<button class="btn btn-sm" id="delete-role-btn" data-rid="${r.id}" style="background:var(--red-light);color:var(--red);border:1px solid #f5b4b0">Delete Role</button>` : ''}
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-secondary" id="close-modal">Cancel</button>
+        <button class="btn btn-primary" id="save-role-btn" data-rid="${r.id||''}">${isEdit ? 'Save Changes' : 'Create Role'}</button>
+      </div>
     </div>
   </div>`;
 }
@@ -927,6 +948,19 @@ function bindRoleModalEvents() {
       label.style.background = cb.checked ? 'var(--green-light)' : 'var(--bg2)';
       label.style.borderColor = cb.checked ? '#a7dfbf' : 'var(--border)';
     });
+  });
+
+  document.getElementById('delete-role-btn')?.addEventListener('click', async () => {
+    const rid = document.getElementById('delete-role-btn').dataset.rid;
+    const ok = await showConfirm({ title: 'Delete Role', message: 'Are you sure you want to delete this role? Users assigned to it will need a new role.', confirmText: 'Yes, Delete', danger: true });
+    if (!ok) return;
+    try {
+      await API.del('/roles/' + rid);
+      toast('Role deleted');
+      closeModal();
+      S.allRoles = await API.get('/roles');
+      refreshBody();
+    } catch(e) { toast(e.message, 'error'); }
   });
 
   document.getElementById('save-role-btn')?.addEventListener('click', async () => {
@@ -1491,25 +1525,14 @@ function bindPageEvents() {
     openModal(renderCategoryForm()); bindCategoryModalEvents();
   });
   document.querySelectorAll('.cat-list-row').forEach(el => {
-    el.addEventListener('click', () => navigateTo('category', { catId: parseInt(el.dataset.cid) }));
-  });
-  document.querySelectorAll('.edit-cat-btn').forEach(el => {
     el.addEventListener('click', () => {
-      const c = (S.categories||[]).find(c => c.id === parseInt(el.dataset.cid));
-      if (c) { openModal(renderCategoryForm(c)); bindCategoryModalEvents(); }
-    });
-  });
-  document.querySelectorAll('.del-cat-btn').forEach(el => {
-    el.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      const ok = await showConfirm({ title: 'Delete Category', message: 'Are you sure you want to delete this category? This cannot be undone.', confirmText: 'Yes, Delete', danger: true });
-      if (!ok) return;
-      try {
-        await API.del('/categories/' + el.dataset.cid);
-        toast('Category deleted');
-        await loadMeta();
-        refreshBody();
-      } catch(e) { toast(e.message, 'error'); }
+      const catId = parseInt(el.dataset.cid);
+      if (can('manage_categories')) {
+        const c = (S.categories||[]).find(c => c.id === catId);
+        if (c) { openModal(renderCategoryForm(c)); bindCategoryModalEvents(); }
+      } else {
+        navigateTo('category', { catId });
+      }
     });
   });
 
@@ -1517,22 +1540,10 @@ function bindPageEvents() {
   document.getElementById('new-role-btn')?.addEventListener('click', () => {
     openModal(renderRoleForm()); bindRoleModalEvents();
   });
-  document.querySelectorAll('.edit-role-btn').forEach(el => {
+  document.querySelectorAll('.role-card').forEach(el => {
     el.addEventListener('click', () => {
       const r = (S.allRoles||[]).find(r => r.id === parseInt(el.dataset.rid));
       if (r) { openModal(renderRoleForm(r)); bindRoleModalEvents(); }
-    });
-  });
-  document.querySelectorAll('.del-role-btn').forEach(el => {
-    el.addEventListener('click', async () => {
-      const ok = await showConfirm({ title: 'Delete Role', message: 'Are you sure you want to delete this role? Users assigned to it will need a new role.', confirmText: 'Yes, Delete', danger: true });
-      if (!ok) return;
-      try {
-        await API.del('/roles/' + el.dataset.rid);
-        toast('Role deleted');
-        S.allRoles = await API.get('/roles');
-        refreshBody();
-      } catch(e) { toast(e.message, 'error'); }
     });
   });
 
@@ -1782,6 +1793,30 @@ async function saveArticle(status) {
 function bindLoginEvents() {
   document.getElementById('login-btn')?.addEventListener('click', doLogin);
   document.getElementById('l-pass')?.addEventListener('keypress', e => { if (e.key === 'Enter') doLogin(); });
+  document.getElementById('register-btn')?.addEventListener('click', doRegister);
+  document.getElementById('r-pass2')?.addEventListener('keypress', e => { if (e.key === 'Enter') doRegister(); });
+  document.getElementById('go-register')?.addEventListener('click', e => { e.preventDefault(); S.registerMode = true; S.registerError = null; render(); });
+  document.getElementById('go-login')?.addEventListener('click', e => { e.preventDefault(); S.registerMode = false; S.loginError = null; render(); });
+}
+
+async function doRegister() {
+  const name = document.getElementById('r-name')?.value.trim();
+  const email = document.getElementById('r-email')?.value.trim();
+  const pass = document.getElementById('r-pass')?.value;
+  const pass2 = document.getElementById('r-pass2')?.value;
+  if (pass !== pass2) { S.registerError = 'Passwords do not match'; render(); return; }
+  showPageLoader('Creating account...');
+  try {
+    const data = await API.post('/auth/register', { name, email, password: pass });
+    S.user = data.user; S.token = data.token;
+    S.page = 'home'; S.currentArticle = null; S.currentCategoryId = null;
+    S.registerMode = false; S.registerError = null;
+    localStorage.setItem('wiki_token', data.token);
+    await Promise.all([loadDashboard(), loadMeta(), loadPermissions()]);
+    hidePageLoader();
+    render();
+    toast('Welcome to QA Knowledge Base!');
+  } catch(e) { hidePageLoader(); S.registerError = e.message; render(); }
 }
 
 async function doLogin() {

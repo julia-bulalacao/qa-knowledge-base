@@ -67,14 +67,23 @@ def update_role(role_id):
 @roles_bp.route('/<int:role_id>', methods=['DELETE'])
 @role_required('admin')
 def delete_role(role_id):
-    role = Role.query.get_or_404(role_id)
-    if role.is_system:
-        return jsonify({'error': 'Cannot delete system roles'}), 400
-    if role.users.count() > 0:
-        return jsonify({'error': f'Cannot delete: {role.users.count()} user(s) still assigned'}), 400
-    db.session.delete(role)
-    db.session.commit()
-    return jsonify({'message': 'Deleted'})
+    try:
+        role = Role.query.get_or_404(role_id)
+        if role.is_system:
+            return jsonify({'error': 'Cannot delete system roles'}), 400
+        user_count = User.query.filter(User.role_slug == role.slug).count()
+        if user_count > 0:
+            return jsonify({'error': f'Cannot delete: {user_count} user(s) still assigned to this role'}), 400
+        from models import RoleCategoryAccess, ArticleRoleAccess
+        RoleCategoryAccess.query.filter_by(role_id=role.id).delete()
+        ArticleRoleAccess.query.filter_by(role_slug=role.slug).delete()
+        db.session.delete(role)
+        db.session.commit()
+        return jsonify({'message': 'Deleted'})
+    except Exception:
+        db.session.rollback()
+        import traceback
+        return jsonify({'error': traceback.format_exc()}), 500
 
 @roles_bp.route('/assign/<int:user_id>', methods=['PUT'])
 @role_required('admin')

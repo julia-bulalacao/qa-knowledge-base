@@ -89,8 +89,19 @@ def list_articles():
         joinedload(Article.tags)
     )
 
-    # Check view_drafts permission from DB
-    if not has_permission(user, 'view_drafts'):
+    # Draft visibility:
+    # - edit_any_article (admin-level): sees all drafts from everyone
+    # - view_drafts only: sees published + own drafts only
+    # - neither: published articles only
+    if has_permission(user, 'edit_any_article'):
+        pass  # no status filter — sees everything
+    elif has_permission(user, 'view_drafts'):
+        from sqlalchemy import and_
+        q = q.filter(or_(
+            Article.status == 'published',
+            and_(Article.status.in_(['draft', 'archived']), Article.author_id == user.id)
+        ))
+    else:
         q = q.filter_by(status='published')
 
     # Apply role-based visibility + category access filtering
@@ -159,8 +170,11 @@ def get_article(article_id):
         joinedload(Article.category),
         joinedload(Article.tags)
     ).get_or_404(article_id)
-    if article.status != 'published' and not has_permission(user, 'view_drafts'):
-        return jsonify({'error': 'Not found'}), 404
+    if article.status != 'published':
+        can_view = (has_permission(user, 'edit_any_article') or
+                    (has_permission(user, 'view_drafts') and article.author_id == user.id))
+        if not can_view:
+            return jsonify({'error': 'Not found'}), 404
     if not _user_can_access_article(article, user):
         return jsonify({'error': 'Not found'}), 404
     if article.status == 'published':
@@ -176,8 +190,11 @@ def get_article(article_id):
 def get_article_by_slug(slug):
     user = get_current_user()
     article = Article.query.filter_by(slug=slug).first_or_404()
-    if article.status != 'published' and not has_permission(user, 'view_drafts'):
-        return jsonify({'error': 'Not found'}), 404
+    if article.status != 'published':
+        can_view = (has_permission(user, 'edit_any_article') or
+                    (has_permission(user, 'view_drafts') and article.author_id == user.id))
+        if not can_view:
+            return jsonify({'error': 'Not found'}), 404
     if not _user_can_access_article(article, user):
         return jsonify({'error': 'Not found'}), 404
     if article.status == 'published':
